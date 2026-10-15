@@ -1,0 +1,40 @@
+{
+  "model_type": "GradientBoostingRegressor",
+  "test_r2": 0.9574901494983427,
+  "features_count": 18,
+  "training_samples": 81100,
+  "feature_names": [
+    "feature_0",
+    "feature_1",
+    "feature_2",
+    "feature_3",
+    "feature_4",
+    "feature_5",
+    "feature_6",
+    "feature_7",
+    "feature_8",
+    "feature_9",
+    "feature_10",
+    "feature_11",
+    "feature_12",
+    "feature_13",
+    "feature_14",
+    "feature_15",
+    "feature_16",
+    "feature_17"
+  ],
+  "results": {
+    "Linear Regression": {
+      "r2": 0.9440643106099461,
+      "rmse": 0.029559320385758335
+    },
+    "Random Forest": {
+      "r2": 0.9565647233413244,
+      "rmse": 0.02604781167475602
+    },
+    "Gradient Boosting": {
+      "r2": 0.9574901494983427,
+      "rmse": 0.02576883211463495
+    }
+  }
+}
