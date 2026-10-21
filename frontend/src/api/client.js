@@ -3,7 +3,7 @@
 // Use the SAME domain as the browser URL to avoid cookie issues
 // If frontend is on http://localhost:5173, use http://localhost:5000
 // If frontend is on http://127.0.0.1:5173, use http://127.0.0.1:5000
-const API_BASE = 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL: API_BASE,

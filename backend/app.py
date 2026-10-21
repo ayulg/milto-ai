@@ -14,6 +14,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import db
 import engine
 
+# NEW: Security modules
+from security import setup_security
+from logger import setup_logging, log
+
 load_dotenv()
 
 try:
@@ -77,6 +81,13 @@ if ANTHROPIC_API_KEY:
 print(f"AI_MODEL: {AI_MODEL}")
 print(f"requests: {'OK' if requests else 'MISSING'}")
 print("=" * 60)
+
+# Setup security (rate limiting + headers + error handlers)
+limiter = setup_security(app)
+
+# Setup logging
+DEBUG = os.environ.get("MILTO_DEBUG", "1") == "1"
+setup_logging(debug=DEBUG)
 
 db.init_db()
 
