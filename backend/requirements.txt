@@ -20,3 +20,4 @@ black==24.4.2
 mypy==1.10.0
 Flask-Limiter==3.5.0
 pydantic==2.7.1
+gunicorn==21.2.0
