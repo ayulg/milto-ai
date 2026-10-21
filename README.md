@@ -1,4 +1,6 @@
-﻿# Milto AI - Career Guidance System
+﻿[![CI](https://github.com/ayulg/milto-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ayulg/milto-ai/actions/workflows/ci.yml)
+
+# Milto AI - Career Guidance System
 
 An adaptive AI-powered career exploration system for Ethiopian universities.
 
@@ -22,4 +24,5 @@ python app.py
 cd frontend
 npm install
 npm run dev
+
 
