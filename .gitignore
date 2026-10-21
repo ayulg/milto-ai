@@ -30,3 +30,10 @@ logs/
 file.txt
 _endpoint.txt
 _temp_endpoint.txt
+
+# Testing artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover

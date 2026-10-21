@@ -875,6 +875,39 @@ def career_change():
     return jsonify(analysis)
 
 
+
+# ============================================================
+# ROUTES: PERSONAL DEVELOPMENT
+# ============================================================
+@app.route("/api/development/plan", methods=["POST"])
+def personal_development_plan():
+    user = require_login()
+    if not user:
+        return error("Log in first.", 401)
+    data = request.get_json(silent=True) or {}
+    goal_query = str(data.get("goal") or "").strip()[:100]
+    if not goal_query:
+        return error("Tell me what you want to develop.")
+    latest, err = get_latest_or_error(user)
+    if err:
+        return err
+    from modules import personal_development
+    plan = personal_development.create_development_plan(goal_query, latest["profile"])
+    if "error" in plan:
+        return jsonify(plan), 400
+    return jsonify(plan)
+
+
+@app.route("/api/development/traits")
+def list_traits():
+    from modules import personal_development
+    return jsonify({
+        "traits": [{"id": k, **v} for k, v in personal_development.TRAIT_LIBRARY.items()],
+        "skills": [{"id": k, **v} for k, v in personal_development.SKILL_LIBRARY.items()],
+    })
+
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
     debug = os.environ.get("MILTO_DEBUG", "1") == "1"

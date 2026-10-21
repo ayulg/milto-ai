@@ -1,12 +1,13 @@
-﻿import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
 import AssessmentPage from './pages/AssessmentPage';
 import DashboardPage from './pages/DashboardPage';
 import CoachPage from './pages/CoachPage';
 import CareerLabPage from './pages/CareerLabPage';
 import CareerChangePage from './pages/CareerChangePage';
-import LoginPage from './pages/LoginPage';
+import DevelopmentPage from './pages/DevelopmentPage';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
             <Route path="/coach" element={<CoachPage />} />
             <Route path="/career-lab" element={<CareerLabPage />} />
             <Route path="/career-change" element={<CareerChangePage />} />
+            <Route path="/development" element={<DevelopmentPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
