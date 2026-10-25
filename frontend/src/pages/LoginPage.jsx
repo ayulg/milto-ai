@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeftIcon, SparklesIcon } from '@heroicons/react/24/outline';
@@ -7,7 +7,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login, register } = useAuth();
   const [mode, setMode] = useState('login'); // 'login' or 'register'
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,11 +19,11 @@ export default function LoginPage() {
 
     try {
       if (mode === 'login') {
-        await login(username, password);
+        await login(email, password);
       } else {
-        await register(username, password);
+        await register(email, password);
       }
-      navigate('/assessment');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Something went wrong');
     } finally {
@@ -56,13 +56,13 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-300">Username</label>
+              <label className="block text-sm font-medium mb-2 text-gray-300">Email Address</label>
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="input"
-                placeholder="Enter your username"
+                placeholder="you@example.com"
                 required
                 minLength={2}
                 maxLength={60}

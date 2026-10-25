@@ -1,35 +1,43 @@
+# Python
 __pycache__/
 *.py[cod]
 *.so
+.Python
 .venv/
 venv/
 env/
 *.egg-info/
+
+# Environment
 .env
 .env.local
+.env.production
+.env.*.local
+
+# Database
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
+
+# Data (large files)
 backend/data/raw/
 backend/data/processed/*.csv
 backend/data/processed/*.npy
 !backend/data/processed/*.json
+
+# Models (large files)
 backend/models/*.pkl
 backend/models/embeddings/*.npy
 backend/models/embeddings/*.faiss
+
+# Node
 node_modules/
 frontend/dist/
 frontend/build/
 frontend/.env
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-*.log
-logs/
-file.txt
-_endpoint.txt
-_temp_endpoint.txt
+frontend/.env.*
 
 # Testing artifacts
 .pytest_cache/
@@ -37,3 +45,31 @@ htmlcov/
 .coverage
 coverage.xml
 *.cover
+.tox/
+.cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+startup_log.txt
+
+# Temp files
+file.txt
+*.broken
+*.bak
+fix_*.py
+check_*.py
+add_*.py
+test_*.ps1
+_endpoint.txt
+_ep.txt

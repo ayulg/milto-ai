@@ -53,3 +53,71 @@ def test_analyze_10_levels():
     analysis = engine.analyze_10_levels(profile)
     assert len(analysis) == 10
     assert all(f"level_{i}" in analysis for i in range(1, 11))
+
+
+def test_recommendation_scores_are_valid():
+    """Every recommendation should have a valid score and percentage."""
+    profile = engine.empty_scores()
+    recommendations = engine.recommend(profile, limit=10)
+
+    assert recommendations
+    for item in recommendations:
+        assert 0.0 <= item["score"] <= 1.0
+        assert 0 <= item["match_percentage"] <= 100
+        assert item["match_percentage"] == round(item["score"] * 100)
+
+
+def test_interested_feedback_increases_score():
+    """Marking a career interested should increase its score."""
+    profile = engine.empty_scores()
+    baseline = engine.recommend(profile, limit=len(engine.CAREERS))
+    career_id = baseline[0]["career"]["id"]
+
+    updated = engine.recommend(
+        profile,
+        feedback={career_id: "interested"},
+        limit=len(engine.CAREERS),
+    )
+
+    baseline_score = next(
+        item["score"] for item in baseline
+        if item["career"]["id"] == career_id
+    )
+    updated_score = next(
+        item["score"] for item in updated
+        if item["career"]["id"] == career_id
+    )
+
+    assert updated_score > baseline_score
+
+
+def test_not_for_me_feedback_decreases_score():
+    """Rejecting a career should decrease its score."""
+    profile = engine.empty_scores()
+    baseline = engine.recommend(profile, limit=len(engine.CAREERS))
+    career_id = baseline[0]["career"]["id"]
+
+    updated = engine.recommend(
+        profile,
+        feedback={career_id: "not_for_me"},
+        limit=len(engine.CAREERS),
+    )
+
+    baseline_score = next(
+        item["score"] for item in baseline
+        if item["career"]["id"] == career_id
+    )
+    updated_score = next(
+        item["score"] for item in updated
+        if item["career"]["id"] == career_id
+    )
+
+    assert updated_score < baseline_score
+
+
+def test_recommendations_respect_limit():
+    """The engine should respect the requested result count."""
+    profile = engine.empty_scores()
+
+    assert len(engine.recommend(profile, limit=3)) <= 3
+    assert len(engine.recommend(profile, limit=5)) <= 5

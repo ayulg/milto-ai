@@ -1,0 +1,28 @@
+MILTO AI UPDATE PATCH
+
+Apply this patch to the root folder of your existing Milto-AI-v2 project.
+The archive contains only changed/new source files and does not include .env, API keys, databases, or dependencies.
+
+Apply:
+1. Back up your project folder first.
+2. Extract this ZIP directly into C:\Users\hp\Downloads\Milto-AI-v2 and allow the listed source files to be overwritten.
+3. Restart the backend from backend\ using the same Python environment and dependencies you already use.
+   The database migration adds a profile_json column and a dismissed_notifications table safely when the backend starts; existing assessments are preserved.
+4. In a second terminal, run `npm run dev` from frontend\.
+5. Test: sign in -> dashboard (not assessment), Profile -> Save profile, assessment history -> Retake assessment, notifications -> View/Dismiss, and AI Coach -> ask for study tips.
+
+Changes:
+- Login now lands on dashboard; users without a first assessment see a start prompt instead of forced redirect loops.
+- Existing assessment results remain in the database and history; retakes create another saved attempt.
+- Added persistent profile fields (display name, study stage, goals, interests) and assessment history screen.
+- Notification dismissals persist per account; View uses client-side navigation and routes to daily tasks, career experiments, or reflections.
+- Dashboard now displays daily tasks and career experiments and allows marking them complete.
+- Added a reflections page using the existing reflection API.
+- AI Coach is instructed to answer the question asked; it can answer general questions without requiring an assessment, and its fallback handles study-habit questions instead of always returning a career recommendation.
+- Removed API-key-prefix logging from backend startup output.
+
+Validation performed on the patch:
+- Python syntax compilation passed.
+- JavaScript/JSX syntax check passed for all 17 source JS/JSX files.
+- SQLite profile and notification-persistence smoke test passed.
+- Full backend integration tests and production frontend build could not be run in this environment because the backend runtime dependencies (including Flask/faiss) were not installed and npm install timed out. Run tests/build in the project's configured environment after applying.

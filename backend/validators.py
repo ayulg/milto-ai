@@ -6,20 +6,19 @@ from typing import Optional
 
 
 class RegisterRequest(BaseModel):
-    username: str = Field(min_length=2, max_length=60)
+    email: str = Field(min_length=5, max_length=120)
     password: str = Field(min_length=8, max_length=200)
 
-    @field_validator("username")
+    @field_validator("email")
     @classmethod
-    def username_alphanumeric(cls, v):
-        cleaned = v.replace(".", "").replace("_", "").replace("-", "").replace(" ", "")
-        if not cleaned.isalnum():
-            raise ValueError("Username must be alphanumeric")
+    def email_must_contain_at(cls, v):
+        if "@" not in v or "." not in v:
+            raise ValueError("Invalid email address")
         return v
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(min_length=1, max_length=60)
+    email: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=1, max_length=200)
 
 

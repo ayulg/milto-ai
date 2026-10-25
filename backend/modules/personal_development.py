@@ -169,8 +169,21 @@ def create_development_plan(goal_query, user_profile):
     if skill_result:
         sid, sdata = skill_result
         return build_12_week_plan(sid, sdata, user_profile)
-    return {
-        "error": f"No template for '{goal_query}' yet.",
-        "available_traits": list(TRAIT_LIBRARY.keys()),
-        "available_skills": list(SKILL_LIBRARY.keys()),
+    # Generic fallback: support goals that are not in the built-in libraries.
+    goal_name = " ".join(goal_query.strip().split())
+    goal_id = "_".join(
+        "".join(ch.lower() if ch.isalnum() else " " for ch in goal_name).split()
+    )
+
+    generic_goal = {
+        "name": goal_name,
+        "description": f"Build practical knowledge and ability in {goal_name}.",
+        "resources": [
+            f"Find a beginner course on {goal_name}",
+            f"Study practical examples of {goal_name}",
+            f"Complete a small project involving {goal_name}",
+            f"Ask an experienced person for feedback on your {goal_name} work",
+        ],
     }
+
+    return build_12_week_plan(goal_id, generic_goal, user_profile or {})

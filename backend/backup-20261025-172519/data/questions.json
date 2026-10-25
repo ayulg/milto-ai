@@ -1,0 +1,386 @@
+[
+  {
+    "id": "stage",
+    "section": "about",
+    "prompt": "Where are you in your working life right now?",
+    "help": "There is no wrong answer. This only changes how we talk about next steps.",
+    "kind": "stage",
+    "required": true
+  },
+  {
+    "id": "goals",
+    "section": "about",
+    "prompt": "In a sentence or two, what would a good next chapter look like?",
+    "help": "Income, meaning, a change of pace, a first job — say it in your own words.",
+    "kind": "text"
+  },
+  {
+    "id": "p_o1",
+    "section": "personality",
+    "prompt": "I get genuinely curious when I run into an idea I have not met before.",
+    "trait": "O",
+    "kind": "likert"
+  },
+  {
+    "id": "p_o2",
+    "section": "personality",
+    "prompt": "I would rather stick with a familiar routine than experiment with a new way of doing things.",
+    "trait": "O",
+    "reverse": true,
+    "kind": "likert"
+  },
+  {
+    "id": "p_c1",
+    "section": "personality",
+    "prompt": "I finish what I start, even when the last stretch is tedious.",
+    "trait": "C",
+    "kind": "likert"
+  },
+  {
+    "id": "p_c2",
+    "section": "personality",
+    "prompt": "My plans often drift, and unfinished work piles up more than I like.",
+    "trait": "C",
+    "reverse": true,
+    "kind": "likert"
+  },
+  {
+    "id": "p_e1",
+    "section": "personality",
+    "prompt": "Being around people for a stretch of time leaves me more energized than drained.",
+    "trait": "E",
+    "kind": "likert"
+  },
+  {
+    "id": "p_e2",
+    "section": "personality",
+    "prompt": "I recover best with quiet, and large groups cost me more than they give.",
+    "trait": "E",
+    "reverse": true,
+    "kind": "likert"
+  },
+  {
+    "id": "p_a1",
+    "section": "personality",
+    "prompt": "I instinctively look for the other person's point of view, even in a disagreement.",
+    "trait": "A",
+    "kind": "likert"
+  },
+  {
+    "id": "p_a2",
+    "section": "personality",
+    "prompt": "I tend to put my own needs first and let other people look after theirs.",
+    "trait": "A",
+    "reverse": true,
+    "kind": "likert"
+  },
+  {
+    "id": "p_n1",
+    "section": "personality",
+    "prompt": "I stay relatively steady when plans change or pressure rises.",
+    "trait": "N",
+    "reverse": true,
+    "kind": "likert"
+  },
+  {
+    "id": "p_n2",
+    "section": "personality",
+    "prompt": "I replay worries more than most people I know, even after the moment has passed.",
+    "trait": "N",
+    "kind": "likert"
+  },
+  {
+    "id": "i_r1",
+    "section": "interests",
+    "prompt": "I enjoy work that involves tools, materials, machines, or the physical world.",
+    "trait": "R",
+    "kind": "likert"
+  },
+  {
+    "id": "i_r2",
+    "section": "interests",
+    "prompt": "I like solving practical problems I can see and touch — a broken thing, a space, a process.",
+    "trait": "R",
+    "kind": "likert"
+  },
+  {
+    "id": "i_r3",
+    "section": "interests",
+    "prompt": "Outdoor, hands-on, or technical work sounds more alive to me than a day of meetings.",
+    "trait": "R",
+    "kind": "likert"
+  },
+  {
+    "id": "i_i1",
+    "section": "interests",
+    "prompt": "I like digging into a question until I understand how it actually works.",
+    "trait": "I",
+    "kind": "likert"
+  },
+  {
+    "id": "i_i2",
+    "section": "interests",
+    "prompt": "Analyzing information, running experiments, or building models sounds like a good day.",
+    "trait": "I",
+    "kind": "likert"
+  },
+  {
+    "id": "i_i3",
+    "section": "interests",
+    "prompt": "I would rather research a hard problem than sell, host, or perform.",
+    "trait": "I",
+    "kind": "likert"
+  },
+  {
+    "id": "i_a1",
+    "section": "interests",
+    "prompt": "I want work that lets me make something original — words, images, spaces, or experiences.",
+    "trait": "A",
+    "kind": "likert"
+  },
+  {
+    "id": "i_a2",
+    "section": "interests",
+    "prompt": "I care about craft, taste, and how something feels, not only whether it functions.",
+    "trait": "A",
+    "kind": "likert"
+  },
+  {
+    "id": "i_a3",
+    "section": "interests",
+    "prompt": "A role with room to invent, write, design, or compose appeals more than a fixed script.",
+    "trait": "A",
+    "kind": "likert"
+  },
+  {
+    "id": "i_s1",
+    "section": "interests",
+    "prompt": "I am drawn to work that helps people learn, heal, or feel less alone.",
+    "trait": "S",
+    "kind": "likert"
+  },
+  {
+    "id": "i_s2",
+    "section": "interests",
+    "prompt": "Listening well and supporting someone through a change is work I respect — and want.",
+    "trait": "S",
+    "kind": "likert"
+  },
+  {
+    "id": "i_s3",
+    "section": "interests",
+    "prompt": "Teaching, counseling, coaching, or community work sounds like a natural fit.",
+    "trait": "S",
+    "kind": "likert"
+  },
+  {
+    "id": "i_e1",
+    "section": "interests",
+    "prompt": "I like taking the lead, pitching an idea, and getting other people moving.",
+    "trait": "E",
+    "kind": "likert"
+  },
+  {
+    "id": "i_e2",
+    "section": "interests",
+    "prompt": "Starting a project, a venture, or a campaign energizes me more than refining a system.",
+    "trait": "E",
+    "kind": "likert"
+  },
+  {
+    "id": "i_e3",
+    "section": "interests",
+    "prompt": "Persuading, negotiating, and owning outcomes sounds like real work to me.",
+    "trait": "E",
+    "kind": "likert"
+  },
+  {
+    "id": "i_c1",
+    "section": "interests",
+    "prompt": "I like bringing order to information — records, schedules, processes, details.",
+    "trait": "C",
+    "kind": "likert"
+  },
+  {
+    "id": "i_c2",
+    "section": "interests",
+    "prompt": "Clear procedures and well-kept systems make me feel competent, not boxed in.",
+    "trait": "C",
+    "kind": "likert"
+  },
+  {
+    "id": "i_c3",
+    "section": "interests",
+    "prompt": "I would rather make a process reliable than invent a brand-new one every week.",
+    "trait": "C",
+    "kind": "likert"
+  },
+  {
+    "id": "s_writing",
+    "section": "skills",
+    "prompt": "Writing — reports, stories, emails that actually land.",
+    "trait": "writing",
+    "kind": "likert"
+  },
+  {
+    "id": "s_verbal",
+    "section": "skills",
+    "prompt": "Speaking — presenting, facilitating, explaining out loud.",
+    "trait": "verbal",
+    "kind": "likert"
+  },
+  {
+    "id": "s_quant",
+    "section": "skills",
+    "prompt": "Numbers — estimates, models, careful quantitative reasoning.",
+    "trait": "quant",
+    "kind": "likert"
+  },
+  {
+    "id": "s_programming",
+    "section": "skills",
+    "prompt": "Programming — code, scripts, computational tools.",
+    "trait": "programming",
+    "kind": "likert"
+  },
+  {
+    "id": "s_design",
+    "section": "skills",
+    "prompt": "Visual design — layout, form, how something looks and feels.",
+    "trait": "design",
+    "kind": "likert"
+  },
+  {
+    "id": "s_research",
+    "section": "skills",
+    "prompt": "Research — finding sources, weighing evidence, synthesizing.",
+    "trait": "research",
+    "kind": "likert"
+  },
+  {
+    "id": "s_teaching",
+    "section": "skills",
+    "prompt": "Teaching and mentoring — helping someone else get better.",
+    "trait": "teaching",
+    "kind": "likert"
+  },
+  {
+    "id": "s_leadership",
+    "section": "skills",
+    "prompt": "Leadership — setting direction and taking responsibility for a group.",
+    "trait": "leadership",
+    "kind": "likert"
+  },
+  {
+    "id": "s_project",
+    "section": "skills",
+    "prompt": "Project management — planning, sequencing, and shipping.",
+    "trait": "project",
+    "kind": "likert"
+  },
+  {
+    "id": "s_empathy",
+    "section": "skills",
+    "prompt": "Listening and empathy — hearing what people need, including the unsaid.",
+    "trait": "empathy",
+    "kind": "likert"
+  },
+  {
+    "id": "s_persuasion",
+    "section": "skills",
+    "prompt": "Persuasion — selling an idea, a product, or a change.",
+    "trait": "persuasion",
+    "kind": "likert"
+  },
+  {
+    "id": "s_hands_on",
+    "section": "skills",
+    "prompt": "Hands-on / technical work — tools, materials, bodies, machines, spaces.",
+    "trait": "hands_on",
+    "kind": "likert"
+  },
+  {
+    "id": "s_data",
+    "section": "skills",
+    "prompt": "Data literacy — reading charts, cleaning data, spotting patterns.",
+    "trait": "data",
+    "kind": "likert"
+  },
+  {
+    "id": "s_creativity",
+    "section": "skills",
+    "prompt": "Creative problem-solving — inventing options that were not on the list.",
+    "trait": "creativity",
+    "kind": "likert"
+  },
+  {
+    "id": "s_systems",
+    "section": "skills",
+    "prompt": "Systems thinking — seeing how parts connect and where the leverage is.",
+    "trait": "systems",
+    "kind": "likert"
+  },
+  {
+    "id": "s_languages",
+    "section": "skills",
+    "prompt": "Languages and cross-cultural work.",
+    "trait": "languages",
+    "kind": "likert"
+  },
+  {
+    "id": "v_autonomy",
+    "section": "values",
+    "prompt": "How much do you need autonomy — choosing how the work gets done?",
+    "trait": "autonomy",
+    "kind": "likert"
+  },
+  {
+    "id": "v_impact",
+    "section": "values",
+    "prompt": "How much do you need to see the impact of your work on people or a cause?",
+    "trait": "impact",
+    "kind": "likert"
+  },
+  {
+    "id": "v_stability",
+    "section": "values",
+    "prompt": "How much do you need stability — durable demand, predictable structure?",
+    "trait": "stability",
+    "kind": "likert"
+  },
+  {
+    "id": "v_income",
+    "section": "values",
+    "prompt": "How important is income potential over the next decade?",
+    "trait": "income",
+    "kind": "likert"
+  },
+  {
+    "id": "v_creativity",
+    "section": "values",
+    "prompt": "How much do you need creative expression in the work itself?",
+    "trait": "creativity",
+    "kind": "likert"
+  },
+  {
+    "id": "v_collaboration",
+    "section": "values",
+    "prompt": "How much do you want to work closely with other people, not mostly alone?",
+    "trait": "collaboration",
+    "kind": "likert"
+  },
+  {
+    "id": "v_learning",
+    "section": "values",
+    "prompt": "How much do you need a field that keeps stretching what you know?",
+    "trait": "learning",
+    "kind": "likert"
+  },
+  {
+    "id": "v_balance",
+    "section": "values",
+    "prompt": "How important is a life with real room outside the job?",
+    "trait": "balance",
+    "kind": "likert"
+  }
+]

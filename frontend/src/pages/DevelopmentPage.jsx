@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeftIcon, SparklesIcon, ClockIcon, CheckCircleIcon, LightBulbIcon, BookOpenIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, SparklesIcon, ClockIcon, CheckCircleIcon, LightBulbIcon, BookOpenIcon, BriefcaseIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 
 export default function DevelopmentPage() {
   const navigate = useNavigate();
@@ -30,45 +30,41 @@ export default function DevelopmentPage() {
     finally { setLoading(false); }
   };
 
-  const examples = ['extraversion', 'discipline', 'confidence', 'programming', 'writing', 'leadership'];
+  const examples = [
+    { group: 'Personal strengths', items: ['confidence', 'discipline', 'communication', 'leadership', 'time management'] },
+    { group: 'Digital & technical', items: ['programming', 'data analysis', 'AI skills', 'cybersecurity', 'web design'] },
+    { group: 'Creative & practical', items: ['writing', 'dancing', 'photography', 'public speaking', 'problem solving'] },
+    { group: 'Career-ready', items: ['teamwork', 'project management', 'research', 'customer service', 'entrepreneurship'] },
+  ];
 
   return (
-    <div className="min-h-screen max-w-5xl mx-auto px-6 py-8">
+    <div className="min-h-screen w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
       <div className="mb-8">
         <Link to="/dashboard" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6">
           <ArrowLeftIcon className="w-4 h-4" />
           <span className="text-sm">Back to Dashboard</span>
         </Link>
-        <div className="flex items-center gap-3 mb-3">
-          <SparklesIcon className="w-8 h-8 text-[#d2a277]" />
-          <h1 className="font-display font-bold text-3xl">Personal Development</h1>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-11 h-11 shrink-0 rounded-2xl bg-[#d2a277]/10 border border-[#d2a277]/20 flex items-center justify-center"><SparklesIcon className="w-6 h-6 text-[#d2a277]" /></div>
+          <div className="min-w-0"><p className="text-xs uppercase tracking-[.18em] text-[#d2a277] mb-1">Build your next capability</p><h1 className="font-display font-bold text-2xl sm:text-3xl md:text-4xl">Personal Development</h1></div>
         </div>
-        <p className="text-gray-400 max-w-2xl">Want to change a personality trait or build a skill? Get a 12-week plan.</p>
+        <p className="text-gray-400 max-w-2xl leading-7">Create a practical 12-week plan for almost any skill, career capability, or personal strength. Start small, practice consistently, and track evidence of progress.</p>
       </div>
 
-      <div className="glass-card p-6 mb-6">
-        <label className="block text-sm font-medium mb-3">What do you want to develop?</label>
-        <div className="flex gap-3">
-          <input type="text" value={goal} onChange={(e) => setGoal(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            placeholder="e.g., extraversion, discipline, programming..."
-            className="input flex-1" disabled={loading} />
-          <button onClick={() => handleCreate()} disabled={!goal.trim() || loading}
-            className="btn btn-primary disabled:opacity-50">
-            {loading ? 'Creating...' : 'Create Plan'}
+      <div className="glass-card p-4 sm:p-6 lg:p-7 mb-6">
+        <div className="flex items-center gap-2 mb-3"><BriefcaseIcon className="w-5 h-5 text-[#d2a277]" /><label htmlFor="development-goal" className="text-sm font-semibold">What do you want to develop?</label></div>
+        <form onSubmit={(e) => { e.preventDefault(); handleCreate(); }} className="flex flex-col sm:flex-row gap-3">
+          <input id="development-goal" type="text" value={goal} onChange={(e) => setGoal(e.target.value)}
+            placeholder="e.g., dancing, nursing skills, Excel, teamwork..." aria-label="Skill or trait to develop"
+            className="input min-w-0 flex-1" disabled={loading} maxLength={100} />
+          <button type="submit" disabled={!goal.trim() || loading} className="btn btn-primary justify-center disabled:opacity-50 sm:shrink-0">
+            {loading ? 'Building plan…' : 'Create 12-week plan'} <SparklesIcon className="w-4 h-4" />
           </button>
+        </form>
+        <div className="mt-6 space-y-5">
+          {examples.map(group => <div key={group.group}><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{group.group}</p><div className="flex flex-wrap gap-2">{group.items.map(ex => <button type="button" key={ex} disabled={loading} onClick={() => { setGoal(ex); handleCreate(ex); }} className="px-3 py-2 rounded-xl bg-white/[.035] border border-white/10 text-xs sm:text-sm text-gray-300 hover:text-white hover:border-[#d2a277]/60 hover:bg-[#d2a277]/[.07] transition-colors disabled:opacity-50">{ex}</button>)}</div></div>)}
         </div>
-        <div className="mt-4">
-          <p className="text-xs text-gray-500 mb-2">Or try:</p>
-          <div className="flex flex-wrap gap-2">
-            {examples.map(ex => (
-              <button key={ex} onClick={() => { setGoal(ex); handleCreate(ex); }}
-                className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs hover:border-[#d2a277]/50 capitalize">
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p className="mt-5 text-xs text-gray-500">You can enter a skill even if it is not listed above. Plans are starting guides—adapt them to your time, access, and experience.</p>
       </div>
 
       {error && (
@@ -85,8 +81,8 @@ export default function DevelopmentPage() {
       )}
 
       {plan && !loading && (
-        <div className="space-y-6">
-          <div className="glass-card p-6">
+        <div className="space-y-5 sm:space-y-6">
+          <div className="glass-card p-5 sm:p-7">
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${plan.goal_type === 'skill' ? 'bg-blue-500/10 border border-blue-500/30 text-blue-300' : 'bg-purple-500/10 border border-purple-500/30 text-purple-300'}`}>
               {plan.goal_type}
             </span>
@@ -94,7 +90,7 @@ export default function DevelopmentPage() {
             <p className="text-gray-400">{plan.goal_description}</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <div className="glass-card p-6">
               <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
                 <CheckCircleIcon className="w-5 h-5 text-green-400" />Daily Habits
@@ -125,7 +121,7 @@ export default function DevelopmentPage() {
             <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
               <ClockIcon className="w-5 h-5 text-[#d2a277]" />Week-by-Week Plan
             </h3>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {plan.weekly_activities.map((w) => (
                 <div key={w.week} className="p-4 rounded-xl bg-white/5 border border-white/5">
                   <div className="flex items-center justify-between mb-2">

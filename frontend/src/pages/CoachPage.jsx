@@ -1,182 +1,97 @@
-﻿import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { coachAPI } from '../api/client';
-import { ArrowLeftIcon, PaperAirplaneIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PaperAirplaneIcon, SparklesIcon, UserIcon } from '@heroicons/react/24/outline';
 
 export default function CoachPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const promptStarted = useRef(false);
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [aiStatus, setAiStatus] = useState(null);
-  const chatEndRef = useRef(null);
+  const [intensity, setIntensity] = useState('direct');
 
   useEffect(() => {
     if (!user) {
       navigate('/login');
       return;
     }
-    loadStatus();
-    // Welcome message
+
     setMessages([{
       role: 'assistant',
-      content: "Hi! I'm your Milto AI Coach. I can help you:\n\n• Explore any career path\n• Understand your skill gaps\n• Build a bridge plan for a new career\n• Find learning resources\n\nWhat would you like to explore today?"
+      content: "Hi! I'm your Milto AI Coach. I'll help you build practical skills and make measurable progress."
     }]);
-  }, [user]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const loadStatus = async () => {
-    try {
-      const r = await coachAPI.getAIStatus();
-      setAiStatus(r.data);
-    } catch {}
-  };
+    const prompt = location.state?.initialPrompt;
+    if (prompt && !promptStarted.current) {
+      promptStarted.current = true;
+      sendMessage(prompt);
+    }
+  }, [user, navigate]);
 
   const sendMessage = async (text) => {
     if (!text.trim() || loading) return;
-
-    const userMsg = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
     setInput('');
     setLoading(true);
 
     try {
-      const response = await coachAPI.sendMessage(text);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: response.data.reply,
-        source: response.data.source
-      }]);
+      const res = await coachAPI.sendMessage(text);
+      setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply || 'I could not generate a response. Please try again.' }]);
     } catch (err) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `Sorry, I hit an error: ${err.response?.data?.error || err.message}. Try again?`
-      }]);
+      const message = err.response?.data?.error || 'Could not connect to the coach. Please check that the backend is running and try again.';
+      setMessages(prev => [...prev, { role: 'assistant', content: message }]);
     } finally {
       setLoading(false);
     }
   };
 
-  const suggestions = [
-    "I want to be a software engineer",
-    "What career fits my personality?",
-    "What should I practice this week?",
-    "I want to change my career",
-  ];
-
   return (
-    <div className="min-h-screen flex flex-col max-w-4xl mx-auto">
-      {/* Header */}
-      <header className="border-b border-white/10 px-6 py-4 flex justify-between items-center sticky top-0 bg-[#0b1117]/95 backdrop-blur z-10">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="text-gray-400 hover:text-white">
-            <ArrowLeftIcon className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[#d2a277] flex items-center justify-center text-[#0b1117] font-bold">
-              M
-            </div>
-            <div>
-              <h1 className="font-display font-bold">AI Coach</h1>
-              <p className="text-xs text-gray-400">
-                {aiStatus?.externalLLM ? `Ready (${aiStatus.model})` : 'Local mode'}
-              </p>
-            </div>
-          </div>
-        </div>
-        <Link to="/career-lab" className="text-sm text-gray-400 hover:text-white">
-          Career Lab →
+    <div className="min-h-screen flex flex-col max-w-4xl mx-auto px-6 py-8">
+      <header className="flex justify-between items-center mb-6">
+        <Link to="/dashboard" className="text-gray-400 hover:text-white flex items-center gap-2">
+          <ArrowLeftIcon className="w-4 h-4" /> Back
         </Link>
+        <div className="flex items-center gap-2">
+          <SparklesIcon className="w-5 h-5 text-[#d2a277]" />
+          <h1 className="font-display font-bold text-xl">Milto AI Coach</h1>
+        </div>
       </header>
 
-      {/* Chat messages */}
-      <div className="flex-1 px-6 py-6 space-y-4 overflow-y-auto">
+      <div className="flex-1 glass-card p-6 mb-4 overflow-y-auto space-y-4" style={{ minHeight: '400px' }}>
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 whitespace-pre-wrap ${
-                msg.role === 'user'
-                  ? 'bg-[#d2a277] text-[#0b1117] rounded-br-sm'
-                  : 'bg-[#18242e] text-gray-100 rounded-bl-sm'
-              }`}
-            >
+          <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {msg.role === 'assistant' && (
+              <div className="w-8 h-8 rounded-full bg-[#d2a277] flex items-center justify-center text-[#0b1117] font-bold text-sm flex-shrink-0">M</div>
+            )}
+            <div className={`max-w-[80%] p-4 rounded-2xl whitespace-pre-wrap ${msg.role === 'user' ? 'bg-[#18242e] rounded-tr-sm' : 'bg-white/5 rounded-tl-sm'}`}>
               {msg.content}
-              {msg.source === 'generative-ai' && (
-                <div className="mt-2 pt-2 border-t border-white/10 text-xs text-gray-400 flex items-center gap-1">
-                  <SparklesIcon className="w-3 h-3" />
-                  AI-generated
-                </div>
-              )}
             </div>
+            {msg.role === 'user' && (
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                <UserIcon className="w-4 h-4 text-gray-400" />
+              </div>
+            )}
           </div>
         ))}
-
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-[#18242e] rounded-2xl px-4 py-3 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#d2a277] animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-2 h-2 rounded-full bg-[#d2a277] animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-2 h-2 rounded-full bg-[#d2a277] animate-bounce" style={{ animationDelay: '300ms' }}></div>
-            </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
+        {loading && <div className="text-gray-500 text-sm">Coach is typing...</div>}
       </div>
 
-      {/* Suggestions */}
-      {messages.length <= 1 && (
-        <div className="px-6 pb-3">
-          <p className="text-xs text-gray-400 mb-2">Try asking:</p>
-          <div className="flex flex-wrap gap-2">
-            {suggestions.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => sendMessage(s)}
-                className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm hover:border-[#d2a277]/50 transition-colors"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Input */}
-      <div className="border-t border-white/10 px-6 py-4">
-        <form
-          onSubmit={(e) => { e.preventDefault(); sendMessage(input); }}
-          className="flex gap-2 items-end"
-        >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(input);
-              }
-            }}
-            placeholder="Ask about careers, skills, or next steps..."
-            className="input flex-1 resize-none"
-            rows="1"
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || loading}
-            className="btn btn-primary p-3 disabled:opacity-50"
-          >
-            <PaperAirplaneIcon className="w-5 h-5" />
-          </button>
-        </form>
-        <p className="text-xs text-gray-500 mt-2">
-          AI uses a minimized profile context. Never enter passwords or sensitive data.
-        </p>
+      <div className="flex gap-2">
+        <input 
+          type="text" 
+          value={input} 
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
+          placeholder="Ask a question about studying, skills, or careers..."
+          className="input flex-1" 
+        />
+        <button onClick={() => sendMessage(input)} className="btn btn-primary px-6">
+          <PaperAirplaneIcon className="w-5 h-5" />
+        </button>
       </div>
     </div>
   );

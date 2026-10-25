@@ -1,173 +1,232 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { assessmentAPI } from '../api/client';
-import { ArrowRightIcon, SparklesIcon, ChartBarIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
+import { assessmentAPI, activityAPI, dailyAPI } from '../api/client';
+import {
+  ArrowRightIcon, SparklesIcon, ChartBarIcon, AcademicCapIcon,
+  HomeIcon, BriefcaseIcon, ClipboardDocumentCheckIcon, CalendarDaysIcon,
+  BeakerIcon, UserCircleIcon, ArrowLeftOnRectangleIcon, CheckCircleIcon,
+  ClockIcon, MagnifyingGlassIcon
+} from '@heroicons/react/24/outline';
+import NotificationBell from '../components/common/NotificationBell';
+
+const NAV_ITEMS = [
+  { id: 'overview', label: 'Overview', icon: HomeIcon },
+  { id: 'careers', label: 'Career matches', icon: BriefcaseIcon },
+  { id: 'daily', label: 'Daily plan', icon: CalendarDaysIcon },
+  { id: 'experiments', label: 'Career experiments', icon: BeakerIcon },
+];
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [daily, setDaily] = useState(null);
+  const [dailyBusy, setDailyBusy] = useState('');
+  const [activityBusy, setActivityBusy] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [activeSection, setActiveSection] = useState('overview');
+  const [sidebarHidden, setSidebarHidden] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+    if (authLoading) return;
+    if (!user) { navigate('/login'); return; }
     loadResults();
-  }, [user]);
+  }, [user, authLoading]);
 
   const loadResults = async () => {
-    // Try sessionStorage first
-    const cached = sessionStorage.getItem('milto_results');
-    if (cached) {
-      setResults(JSON.parse(cached));
-      setLoading(false);
-      return;
-    }
-
     try {
       const response = await assessmentAPI.getResults();
-      if (response.data.assessment) {
-        setResults(response.data);
+      const data = response.data;
+      try {
+        const dailyResponse = await dailyAPI.get();
+        setDaily(dailyResponse.data.daily || null);
+      } catch (dailyError) {
+        console.warn('Could not load daily tasks:', dailyError.response?.data || dailyError.message);
+      }
+      if (data.assessment) {
+        const savedResults = { ...data, ...data.assessment };
+        setResults(savedResults);
+        sessionStorage.setItem('milto_results', JSON.stringify(savedResults));
       } else {
-        navigate('/assessment');
+        sessionStorage.removeItem('milto_results');
+        setResults(null);
       }
     } catch (err) {
-      navigate('/assessment');
-    } finally {
-      setLoading(false);
-    }
+      console.error('Could not load saved assessment:', err.response?.status, err.response?.data || err.message);
+      setLoadError(err.response?.data?.error || err.message || 'Could not load saved results. Please try again.');
+    } finally { setLoading(false); }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
+  const handleLogout = async () => { await logout(); navigate('/'); };
+
+  const handleDailyToggle = async (task) => {
+    if (!daily || dailyBusy) return;
+    setDailyBusy(task.id); setActionError('');
+    try {
+      const done = !daily.done?.[task.id];
+      const response = await dailyAPI.toggleTask(daily.day_key, task.id, done);
+      setDaily(response.data.daily);
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Could not update that task. Please try again.');
+    } finally { setDailyBusy(''); }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-[#d2a277] border-t-transparent rounded-full animate-spin"></div>
+  const handleActivityComplete = async (activity) => {
+    if (activityBusy) return;
+    setActivityBusy(activity.id); setActionError('');
+    try {
+      const response = await activityAPI.complete(activity.id);
+      setResults(current => {
+        if (!current) return current;
+        const updated = {
+          ...current,
+          activities: response.data.activities || current.activities,
+          activityDone: response.data.activityDone || current.activityDone,
+          activityFeedback: response.data.activityFeedback || current.activityFeedback,
+        };
+        sessionStorage.setItem('milto_results', JSON.stringify(updated));
+        return updated;
+      });
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Could not complete that activity. Please try again.');
+    } finally { setActivityBusy(''); }
+  };
+
+  if (loading || authLoading) return <div className="min-h-screen flex items-center justify-center"><div className="w-10 h-10 border-4 border-[#d2a277] border-t-transparent rounded-full animate-spin" /></div>;
+
+  if (!results && loadError) return (
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="glass-card p-8 max-w-lg w-full">
+        <h2 className="text-xl font-bold mb-3">Could not load your saved results</h2>
+        <p className="text-red-400 mb-6">{loadError}</p>
+        <button onClick={() => window.location.reload()} className="btn btn-primary">Try again</button>
+        <button onClick={() => navigate('/assessment')} className="btn btn-secondary ml-3">Start assessment</button>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (!results) return null;
+  const displayName = user?.display_name || user?.email?.split('@')[0] || 'there';
 
-  const { profile, analysis, recommendations, hollandCode, hollandNarrative } = results;
+  if (!results) return (
+    <div className="min-h-screen p-5 md:p-8">
+      <header className="max-w-5xl mx-auto flex justify-between items-center mb-12">
+        <Link to="/" className="flex items-center gap-3 font-display font-bold text-xl"><span className="brand-mark">M</span> Milto AI</Link>
+        <div className="flex items-center gap-3"><NotificationBell /><Link to="/profile" className="btn btn-secondary text-sm">Profile</Link><button onClick={handleLogout} className="btn btn-secondary text-sm">Log out</button></div>
+      </header>
+      <main className="max-w-4xl mx-auto">
+        <div className="dashboard-hero glass-card p-8 md:p-12">
+          <span className="eyebrow">YOUR CAREER JOURNEY</span>
+          <h1 className="font-display text-3xl md:text-5xl font-bold mt-3 mb-4">Welcome, {displayName}.</h1>
+          <p className="text-gray-400 max-w-2xl leading-7 mb-8">Build a career profile based on your interests, strengths, and goals. Complete your first assessment to get personalized career insights.</p>
+          <div className="flex flex-wrap gap-3"><button onClick={() => navigate('/assessment')} className="btn btn-primary">Start your assessment <ArrowRightIcon className="w-4 h-4" /></button><Link to="/coach" className="btn btn-secondary">Meet your AI coach</Link></div>
+        </div>
+      </main>
+    </div>
+  );
+
+  const { profile, analysis, recommendations = [], hollandCode, hollandNarrative } = results;
+  const tasks = daily?.plan || [];
+  const completedTasks = tasks.filter(task => Boolean(daily?.done?.[task.id])).length;
+  const activities = results.activities || [];
+  const completedActivities = activities.filter(activity => Boolean(results.activityDone?.[activity.id])).length;
+  const topCareer = recommendations[0]?.career?.title;
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#d2a277] flex items-center justify-center font-bold text-xl text-[#0b1117]">
-              M
-            </div>
-            <span className="font-display font-bold text-xl">Milto AI</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link to="/coach" className="btn btn-secondary text-sm">AI Coach</Link>
-            <button onClick={handleLogout} className="btn btn-secondary text-sm">
-              Logout
+    <div className={`min-h-screen dashboard-shell ${sidebarHidden ? "sidebar-collapsed" : ""}`}>
+      <aside className="dashboard-sidebar">
+        <div className="sidebar-top-row">
+          <Link to="/dashboard" className="brand-lockup"><span className="brand-mark">M</span><span><strong>Milto AI</strong><small>CAREER COMPANION</small></span></Link>
+          <button
+            type="button"
+            onClick={() => setSidebarHidden(true)}
+            className="sidebar-toggle"
+            aria-label="Hide sidebar"
+            title="Hide sidebar"
+          >
+            ☰
+          </button>
+        </div>
+        <p className="sidebar-label">WORKSPACE</p>
+        <nav className="sidebar-nav" aria-label="Dashboard sections">
+          {NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            return <button key={item.id} onClick={() => setActiveSection(item.id)} className={`sidebar-link ${activeSection === item.id ? 'active' : ''}`}><Icon className="w-5 h-5" /><span>{item.label}</span>{activeSection === item.id && <span className="nav-indicator" />}</button>;
+          })}
+        </nav>
+        <p className="sidebar-label sidebar-label-spaced">EXPLORE</p>
+        <nav className="sidebar-nav" aria-label="Milto tools">
+          <Link to="/assessment" className="sidebar-link"><ClipboardDocumentCheckIcon className="w-5 h-5" /><span>Assessments</span></Link>
+          <Link to="/career-lab" className="sidebar-link"><MagnifyingGlassIcon className="w-5 h-5" /><span>Career explorer</span></Link>
+          <Link to="/development" className="sidebar-link"><AcademicCapIcon className="w-5 h-5" /><span>Personal growth</span></Link>
+          <Link to="/coach" className="sidebar-link"><SparklesIcon className="w-5 h-5" /><span>AI career coach</span></Link>
+        </nav>
+        <div className="sidebar-bottom">
+          <Link to="/profile" className="profile-mini"><span className="avatar-mini">{displayName.slice(0, 1).toUpperCase()}</span><span className="profile-mini-text"><strong>{displayName}</strong><small>View profile</small></span><UserCircleIcon className="w-5 h-5 text-gray-500" /></Link>
+          <button onClick={handleLogout} className="sidebar-link logout-link"><ArrowLeftOnRectangleIcon className="w-5 h-5" /><span>Log out</span></button>
+        </div>
+      </aside>
+
+      <main className="dashboard-main">
+        <header className="dashboard-topbar">
+          {sidebarHidden && (
+            <button
+              type="button"
+              onClick={() => setSidebarHidden(false)}
+              className="sidebar-toggle"
+              aria-label="Show sidebar"
+              title="Show sidebar"
+            >
+              ☰
             </button>
+          )}
+          <div>
+            <p className="topbar-date">YOUR PERSONAL CAREER SPACE</p>
+            <p className="topbar-caption">A little progress, consistently.</p>
           </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        {/* Welcome */}
-        <div className="mb-10">
-          <p className="text-[#d2a277] text-sm font-medium mb-2">Your Milto Profile</p>
-          <h1 className="font-display font-bold text-4xl md:text-5xl mb-3">
-            Hello, {user?.username}
-          </h1>
-          <p className="text-gray-400 max-w-3xl">
-            Based on your assessment, here is your personality analysis and top career matches.
-          </p>
-        </div>
-
-        {/* 10-Level Analysis */}
-        {analysis && (
-          <section className="mb-10">
-            <h2 className="font-display font-bold text-2xl mb-5 flex items-center gap-2">
-              <AcademicCapIcon className="w-6 h-6 text-[#d2a277]" />
-              10-Level Analysis
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {Object.entries(analysis).map(([key, level]) => (
-                <div key={key} className="glass-card p-4 text-center">
-                  <div className="text-3xl font-display font-bold text-[#d2a277] mb-1">
-                    {level.score}
-                  </div>
-                  <div className="text-xs text-gray-400">{level.name}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Holland Code */}
-        <section className="mb-10">
-          <div className="glass-card p-8">
-            <div className="flex flex-col md:flex-row md:items-center gap-6">
-              <div>
-                <p className="text-sm text-gray-400 mb-2">Your Holland Code (RIASEC)</p>
-                <div className="font-display font-bold text-6xl tracking-wider text-[#d2a277]">
-                  {hollandCode}
-                </div>
-              </div>
-              <div className="flex-1">
-                <p className="text-gray-300">{hollandNarrative}.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Top 10 Career Matches */}
-        <section className="mb-10">
-          <h2 className="font-display font-bold text-2xl mb-5 flex items-center gap-2">
-            <ChartBarIcon className="w-6 h-6 text-[#d2a277]" />
-            Top 10 Career Matches
-          </h2>
-          <div className="space-y-3">
-            {recommendations?.map((rec, idx) => (
-              <CareerMatchCard key={rec.career.id} rank={idx + 1} rec={rec} />
-            ))}
-          </div>
-        </section>
-
-        {/* Next Steps */}
-        <section>
-          <h2 className="font-display font-bold text-2xl mb-5 flex items-center gap-2">
-            <SparklesIcon className="w-6 h-6 text-[#d2a277]" />
-            Next Steps
-          </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Link to="/coach" className="glass-card p-6 hover:border-[#d2a277]/30 transition-all">
-              <h3 className="font-display font-bold text-xl mb-2">Talk to AI Coach</h3>
-              <p className="text-gray-400 text-sm mb-4">
-                Get personalized advice about any career path.
-              </p>
-              <span className="text-[#d2a277] text-sm font-medium inline-flex items-center gap-1">
-                Start chatting <ArrowRightIcon className="w-4 h-4" />
-              </span>
-            </Link>
-            <Link to="/career-lab" className="glass-card p-6 hover:border-[#d2a277]/30 transition-all">
-              <h3 className="font-display font-bold text-xl mb-2">Explore a Career</h3>
-              <p className="text-gray-400 text-sm mb-4">
-                Want a career not in your top 10? Analyze any path.
-              </p>
-              <span className="text-[#d2a277] text-sm font-medium inline-flex items-center gap-1">
-                Open Career Lab <ArrowRightIcon className="w-4 h-4" />
-              </span>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <Link to="/profile" className="topbar-profile">
+              <span className="avatar-mini">{displayName.slice(0, 1).toUpperCase()}</span>
+              <span>{displayName}</span>
             </Link>
           </div>
-        </section>
-      </div>
+        </header>
+        <div className="dashboard-content animate-fade-in">
+          {actionError && <div role="alert" className="mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{actionError}</div>}
+
+          {activeSection === 'overview' && <>
+            <section className="dashboard-hero dashboard-hero-compact">
+              <div className="hero-copy"><span className="eyebrow">YOUR JOURNEY, YOUR PACE</span><h1 className="font-display">Good to see you, {displayName}.</h1><p>Your career path starts with understanding what matters to you. Here is your progress at a glance.</p><div className="flex flex-wrap gap-3 mt-6"><button onClick={() => setActiveSection('careers')} className="btn btn-primary">Explore my matches <ArrowRightIcon className="w-4 h-4" /></button><Link to="/coach" className="btn btn-secondary">Ask your AI coach</Link></div></div>
+              <div className="hero-orbit" aria-hidden="true"><div className="orbit-ring orbit-ring-one" /><div className="orbit-ring orbit-ring-two" /><div className="orbit-core"><SparklesIcon className="w-9 h-9" /></div><span className="orbit-dot orbit-dot-one" /><span className="orbit-dot orbit-dot-two" /></div>
+            </section>
+            <section className="stat-grid" aria-label="Your progress">
+              <div className="stat-card"><span className="stat-icon"><BriefcaseIcon className="w-5 h-5" /></span><span className="stat-label">Career matches</span><strong>{recommendations.length}</strong><small>Paths to explore</small></div>
+              <div className="stat-card"><span className="stat-icon"><CheckCircleIcon className="w-5 h-5" /></span><span className="stat-label">Daily progress</span><strong>{completedTasks}<em>/{tasks.length}</em></strong><small>Steps completed today</small></div>
+              <div className="stat-card"><span className="stat-icon"><BeakerIcon className="w-5 h-5" /></span><span className="stat-label">Experiments</span><strong>{completedActivities}<em>/{activities.length}</em></strong><small>Activities completed</small></div>
+            </section>
+            <section className="overview-grid">
+              <div className="panel-card career-preview"><div className="panel-heading"><div><span className="eyebrow">A PLACE TO START</span><h2>Your leading career match</h2></div><ChartBarIcon className="section-icon" /></div>
+                {recommendations.slice(0, 3).map((rec, idx) => <div className="preview-career" key={rec.career.id}><span className="career-rank">0{idx + 1}</span><div className="min-w-0 flex-1"><strong>{rec.career.title}</strong><small>{rec.career.cluster || 'Career path'}</small></div><strong className="match-value">{rec.match_percentage || Math.round((rec.score || 0) * 100)}%</strong></div>)}
+                {recommendations.length === 0 && <p className="text-gray-400 text-sm">No career matches are available yet.</p>}
+                <button onClick={() => setActiveSection('careers')} className="panel-footer-link">View all matches <ArrowRightIcon className="w-4 h-4" /></button>
+              </div>
+              <div className="panel-card progress-preview"><div className="panel-heading"><div><span className="eyebrow">YOUR PROFILE</span><h2>Personal insight</h2></div><AcademicCapIcon className="section-icon" /></div><div className="holland-code">{hollandCode || 'â€”'}</div><p className="text-sm text-gray-400 leading-6">{hollandNarrative || 'Your interest profile will help you reflect on the types of work that may suit you.'}</p><div className="profile-progress-track"><span style={{ width: `${tasks.length ? Math.round(completedTasks / tasks.length * 100) : 0}%` }} /></div><div className="flex justify-between text-xs text-gray-500 mt-2"><span>Today's plan</span><span>{tasks.length ? Math.round(completedTasks / tasks.length * 100) : 0}% complete</span></div><button onClick={() => setActiveSection('daily')} className="panel-footer-link">Open daily plan <ArrowRightIcon className="w-4 h-4" /></button></div>
+            </section>
+            <section className="quick-actions"><div><span className="eyebrow">KEEP MOVING FORWARD</span><h2>What would you like to do next?</h2></div><div className="quick-action-grid"><Link to="/career-lab" className="quick-action"><span className="quick-action-icon"><MagnifyingGlassIcon className="w-5 h-5" /></span><span><strong>Explore a career</strong><small>Research any path you are curious about</small></span><ArrowRightIcon className="w-4 h-4" /></Link><Link to="/development" className="quick-action"><span className="quick-action-icon"><AcademicCapIcon className="w-5 h-5" /></span><span><strong>Build a skill</strong><small>Create a personal development plan</small></span><ArrowRightIcon className="w-4 h-4" /></Link></div></section>
+          </>}
+
+          {activeSection === 'careers' && <section><div className="page-heading"><span className="eyebrow">PERSONALIZED FOR YOU</span><h1>Career matches</h1><p>Use these as starting points for research and real-world explorationâ€”not as fixed predictions.</p></div><div className="section-toolbar"><span>{recommendations.length} suggested paths</span><Link to="/career-lab" className="btn btn-primary text-sm">Explore another career <ArrowRightIcon className="w-4 h-4" /></Link></div>{recommendations.length ? <div className="career-grid">{recommendations.map((rec, idx) => <CareerMatchCard key={rec.career.id} rank={idx + 1} rec={rec} />)}</div> : <div className="panel-card"><p className="text-gray-400">No matches yet. Try completing an assessment.</p><Link to="/assessment" className="btn btn-primary mt-4">Take assessment</Link></div>}</section>}
+
+          {activeSection === 'daily' && <section><div className="page-heading"><span className="eyebrow">SMALL STEPS ADD UP</span><h1>Your daily plan</h1><p>Complete manageable actions and track your progress as you go.</p></div><div className="panel-card"><div className="panel-heading"><div><h2>Today's small steps</h2><p className="text-sm text-gray-400 mt-1">{completedTasks} of {tasks.length} completed</p></div><span className="section-icon"><CalendarDaysIcon className="w-6 h-6" /></span></div><div className="profile-progress-track mb-5"><span style={{ width: `${tasks.length ? completedTasks / tasks.length * 100 : 0}%` }} /></div>{tasks.length ? <div className="task-list">{tasks.map(task => { const done = Boolean(daily?.done?.[task.id]); return <label key={task.id} className={`task-row ${done ? 'task-done' : ''}`}><input type="checkbox" checked={done} disabled={dailyBusy === task.id} onChange={() => handleDailyToggle(task)} /><span className="task-copy"><strong>{task.title}</strong>{task.description && <small>{task.description}</small>}</span>{dailyBusy === task.id ? <span className="text-xs text-gray-500">Savingâ€¦</span> : done ? <CheckCircleIcon className="w-5 h-5 text-emerald-400" /> : <ClockIcon className="w-5 h-5 text-gray-500" />}</label>; })}</div> : <div className="empty-state"><CalendarDaysIcon className="w-8 h-8" /><h3>No daily plan available</h3><p>Your daily steps will appear here when they are ready.</p></div>}</div></section>}
+
+          {activeSection === 'experiments' && <section><div className="page-heading"><span className="eyebrow">TRY BEFORE YOU DECIDE</span><h1>Career experiments</h1><p>Small, practical activities can help you learn what a career is really like.</p></div>{activities.length ? <div className="experiment-list">{activities.map(activity => { const done = Boolean(results.activityDone?.[activity.id]); return <article key={activity.id} className="panel-card experiment-card"><div className="experiment-symbol"><BeakerIcon className="w-6 h-6" /></div><div className="flex-1 min-w-0"><div className="flex flex-wrap items-center gap-2"><h2>{activity.title || 'Career exploration activity'}</h2>{done && <span className="status-pill"><CheckCircleIcon className="w-3 h-3" /> Completed</span>}</div>{activity.description && <p>{activity.description}</p>}{activity.duration && <small><ClockIcon className="w-3.5 h-3.5 inline mr-1" />Estimated time: {activity.duration}</small>}</div><button type="button" disabled={done || activityBusy === activity.id} onClick={() => handleActivityComplete(activity)} className={done ? 'btn btn-secondary text-sm opacity-70' : 'btn btn-primary text-sm'}>{done ? 'Completed' : activityBusy === activity.id ? 'Savingâ€¦' : 'Mark complete'}</button></article>; })}</div> : <div className="panel-card empty-state"><BeakerIcon className="w-8 h-8" /><h3>No experiments available yet</h3><p>Your assessment can help generate activities to test career interests.</p><Link to="/assessment" className="btn btn-primary mt-4">Review assessment</Link></div>}</section>}
+
+          <footer className="dashboard-footer"><span>Milto AI Â· Career exploration, one step at a time.</span></footer>
+        </div>
+      </main>
     </div>
   );
 }
@@ -175,32 +234,6 @@ export default function DashboardPage() {
 function CareerMatchCard({ rank, rec }) {
   const { career, match_percentage, reasons } = rec;
   const pct = match_percentage || Math.round((rec.score || 0) * 100);
-
-  return (
-    <div className="glass-card p-5 hover:border-[#d2a277]/30 transition-all">
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-[#d2a277]/10 flex items-center justify-center font-display font-bold text-xl text-[#d2a277]">
-          {rank}
-        </div>
-        <div className="flex-1">
-          <div className="flex justify-between items-start gap-4 mb-2">
-            <div>
-              <h3 className="font-display font-bold text-lg">{career.title}</h3>
-              <p className="text-sm text-gray-400">{career.cluster}</p>
-            </div>
-            <div className="text-right">
-              <div className="text-3xl font-display font-bold text-[#d2a277]">{pct}%</div>
-              <div className="text-xs text-gray-500">match</div>
-            </div>
-          </div>
-          <p className="text-sm text-gray-400 mb-3">{career.summary}</p>
-          {reasons && reasons.length > 0 && (
-            <div className="text-xs text-gray-500">
-              <strong className="text-gray-400">Why it fits:</strong> {reasons[0]}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <article className="career-match-card"><div className="career-card-top"><span className="career-rank">{String(rank).padStart(2, '0')}</span><span className="match-value">{pct}% <small>match</small></span></div><h2>{career.title}</h2><p className="career-cluster">{career.cluster || 'Career path'}</p><p className="career-summary">{career.summary}</p>{reasons?.length > 0 && <div className="why-fit"><strong>Why it may fit</strong><p>{reasons[0]}</p></div>}</article>;
 }
+

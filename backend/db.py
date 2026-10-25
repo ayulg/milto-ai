@@ -14,9 +14,10 @@ PRAGMA synchronous = NORMAL;
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    profile_json TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS assessments (
@@ -78,6 +79,13 @@ CREATE TABLE IF NOT EXISTS reflections (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS dismissed_notifications (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    notification_id TEXT NOT NULL,
+    dismissed_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, notification_id)
+);
+
 CREATE TABLE IF NOT EXISTS career_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -117,17 +125,21 @@ def _json(value, default):
 def init_db():
     conn = get_conn()
     conn.executescript(SCHEMA)
+    # Upgrade databases created by older versions without destroying user data.
+    user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "profile_json" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN profile_json TEXT NOT NULL DEFAULT '{}' ")
     conn.commit()
     conn.close()
 
 
 # ============ USERS ============
-def create_user(username, password_hash):
+def create_user(email, password_hash):
     conn = get_conn()
     try:
         cur = conn.execute(
-            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-            (username, password_hash, now()),
+            "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)",
+            (email, password_hash, now()),
         )
         conn.execute(
             "INSERT OR IGNORE INTO user_settings (user_id, updated_at) VALUES (?, ?)",
@@ -139,9 +151,9 @@ def create_user(username, password_hash):
         conn.close()
 
 
-def get_user_by_username(username):
+def get_user_by_email(email):
     conn = get_conn()
-    row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     conn.close()
     return dict(row) if row else None
 
@@ -156,6 +168,40 @@ def get_user_by_id(user_id):
 def update_password(user_id, password_hash):
     conn = get_conn()
     conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+    conn.commit()
+    conn.close()
+
+
+# ============ USER PROFILE ============
+def get_user_profile(user_id):
+    conn = get_conn()
+    row = conn.execute("SELECT profile_json FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return _json(row["profile_json"], {}) if row else {}
+
+
+def update_user_profile(user_id, profile):
+    conn = get_conn()
+    conn.execute("UPDATE users SET profile_json = ? WHERE id = ?",
+                 (json.dumps(profile, ensure_ascii=False), user_id))
+    conn.commit()
+    conn.close()
+    return profile
+
+
+# ============ NOTIFICATION DISMISSALS ============
+def get_dismissed_notifications(user_id):
+    conn = get_conn()
+    rows = conn.execute("SELECT notification_id FROM dismissed_notifications WHERE user_id = ?",
+                        (user_id,)).fetchall()
+    conn.close()
+    return {row["notification_id"] for row in rows}
+
+
+def dismiss_notification(user_id, notification_id):
+    conn = get_conn()
+    conn.execute("INSERT OR IGNORE INTO dismissed_notifications (user_id, notification_id, dismissed_at) VALUES (?, ?, ?)",
+                 (user_id, notification_id, now()))
     conn.commit()
     conn.close()
 

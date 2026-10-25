@@ -1,0 +1,171 @@
+﻿"""Build career embeddings and a FAISS index for Milto AI."""
+
+import json
+from pathlib import Path
+
+import numpy as np
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError as exc:
+    raise SystemExit(
+        "Install sentence-transformers in your active Python environment."
+    ) from exc
+
+try:
+    import faiss
+except ImportError as exc:
+    raise SystemExit(
+        "Install faiss-cpu in your active Python environment."
+    ) from exc
+
+
+# This file is located at backend/scripts/add_embeddings.py
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BACKEND_DIR / "data"
+PROCESSED_DIR = DATA_DIR / "processed"
+EMBEDDINGS_DIR = PROCESSED_DIR / "embeddings"
+MODEL_NAME = "all-MiniLM-L6-v2"
+
+
+def load_careers():
+    """Load career records from supported project data locations."""
+    candidates = [
+        PROCESSED_DIR / "unified_careers.json",
+        PROCESSED_DIR / "esco_occupations.json",
+        DATA_DIR / "milto" / "careers.json",
+        DATA_DIR / "careers.json",
+    ]
+
+    for path in candidates:
+        if not path.is_file():
+            continue
+
+        with path.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        if isinstance(data, list) and data:
+            print(f"Loaded {len(data)} careers from {path}")
+            return data
+
+    raise FileNotFoundError(
+        "No career data list found. Checked:\n"
+        + "\n".join(str(path) for path in candidates)
+    )
+
+
+def create_document_text(career):
+    """Create searchable text while handling missing or malformed fields."""
+    parts = [
+        career.get("title", ""),
+        career.get("description", ""),
+        career.get("summary", ""),
+        career.get("cluster", ""),
+        career.get("education", ""),
+    ]
+
+    for field in ("skills", "activities", "values"):
+        value = career.get(field, [])
+        if isinstance(value, list):
+            parts.extend(
+                item for item in value if isinstance(item, str)
+            )
+        elif isinstance(value, str):
+            parts.append(value)
+
+    return " ".join(
+        str(part).strip()
+        for part in parts
+        if part is not None and str(part).strip()
+    )
+
+
+def build_embeddings():
+    """Create embeddings and save the FAISS index and aligned metadata."""
+    careers = load_careers()
+
+    # Keep each document and its corresponding career together.
+    valid_careers = []
+    documents = []
+
+    for career in careers:
+        if not isinstance(career, dict):
+            continue
+
+        document = create_document_text(career)
+        if not document:
+            continue
+
+        if not career.get("id"):
+            raise ValueError(
+                f"Career is missing an id: {career.get('title', '<untitled>')}"
+            )
+
+        documents.append(document)
+        valid_careers.append(career)
+
+    if not documents:
+        raise ValueError("No valid searchable career records were found.")
+
+    if len({career["id"] for career in valid_careers}) != len(valid_careers):
+        raise ValueError("Duplicate career IDs found in the source data.")
+
+    print(f"Encoding {len(documents)} career records with {MODEL_NAME}...")
+    model = SentenceTransformer(MODEL_NAME)
+
+    embeddings = model.encode(
+        documents,
+        convert_to_numpy=True,
+        normalize_embeddings=True,
+        show_progress_bar=True,
+    )
+    embeddings = np.asarray(embeddings, dtype=np.float32)
+
+    if embeddings.ndim != 2 or embeddings.shape[0] != len(valid_careers):
+        raise ValueError("Embedding count does not match career count.")
+
+    if not np.isfinite(embeddings).all():
+        raise ValueError("Embeddings contain invalid numeric values.")
+
+    norms = np.linalg.norm(embeddings, axis=1)
+    if np.any(norms == 0):
+        raise ValueError("One or more embeddings have zero length.")
+
+    # Normalize again defensively before inner-product cosine search.
+    embeddings = np.ascontiguousarray(
+        embeddings / norms[:, np.newaxis],
+        dtype=np.float32,
+    )
+
+    EMBEDDINGS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Save vectors for diagnostics or other search implementations.
+    np.save(EMBEDDINGS_DIR / "career_embeddings.npy", embeddings)
+
+    # Inner product on normalized vectors is cosine similarity.
+    index = faiss.IndexFlatIP(embeddings.shape[1])
+    index.add(embeddings)
+    faiss.write_index(
+        index, str(EMBEDDINGS_DIR / "career_index.faiss")
+    )
+
+    metadata = {
+        "model": MODEL_NAME,
+        "embedding_dim": int(embeddings.shape[1]),
+        "num_careers": len(valid_careers),
+        "career_ids": [career["id"] for career in valid_careers],
+    }
+
+    with (EMBEDDINGS_DIR / "metadata.json").open(
+        "w", encoding="utf-8"
+    ) as file:
+        json.dump(metadata, file, indent=2, ensure_ascii=False)
+
+    print(f"Successfully indexed {len(valid_careers)} careers.")
+    print(f"Index: {EMBEDDINGS_DIR / 'career_index.faiss'}")
+    print(f"Metadata: {EMBEDDINGS_DIR / 'metadata.json'}")
+    print(f"Vectors: {EMBEDDINGS_DIR / 'career_embeddings.npy'}")
+
+
+if __name__ == "__main__":
+    build_embeddings()

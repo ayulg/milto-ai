@@ -1,9 +1,21 @@
-"""
+﻿"""
 Core engine for Milto AI
 Handles scoring, recommendations, and analysis
 """
 import json
+import numpy as np
 import math
+
+import joblib
+try:
+    _ml_model = joblib.load("models/career_ranker_v2.pkl")
+    _ml_scaler = joblib.load("models/scaler_v2.pkl")
+except:
+    _ml_model = None
+    _ml_scaler = None
+
+import faiss
+from sentence_transformers import SentenceTransformer
 import os
 from pathlib import Path
 
@@ -319,7 +331,7 @@ def explain_career(career, profile):
     if shared:
         reasons.append(
             "Your interest pattern ({}) overlaps this role's {} core.".format(
-                " · ".join(RIASEC_META[k]["short"] for k in user_code),
+                " Â· ".join(RIASEC_META[k]["short"] for k in user_code),
                 " / ".join(RIASEC_META[k]["label"].lower() for k in job_code),
             )
         )
@@ -327,15 +339,15 @@ def explain_career(career, profile):
     trait_notes = []
     p, cf = profile["personality"], career["bigFive"]
     if p["O"] >= 65 and cf["O"] >= 4:
-        trait_notes.append("high openness — you will not mind a field that keeps changing")
+        trait_notes.append("high openness â€” you will not mind a field that keeps changing")
     if p["C"] >= 65 and cf["C"] >= 4:
-        trait_notes.append("follow-through — this work rewards people who finish")
+        trait_notes.append("follow-through â€” this work rewards people who finish")
     if p["E"] >= 65 and cf["E"] >= 4:
-        trait_notes.append("social energy — the role is built around other people")
+        trait_notes.append("social energy â€” the role is built around other people")
     elif p["E"] <= 40 and cf["E"] <= 3:
-        trait_notes.append("a quieter tempo — deep work is more of the day than performance")
+        trait_notes.append("a quieter tempo â€” deep work is more of the day than performance")
     if p["A"] >= 65 and cf["A"] >= 4:
-        trait_notes.append("a cooperative bent — the work is relational, not purely adversarial")
+        trait_notes.append("a cooperative bent â€” the work is relational, not purely adversarial")
     if p["N"] <= 40 and cf["N"] <= 2:
         trait_notes.append("steadiness under pressure, which this path periodically needs")
     
@@ -345,7 +357,7 @@ def explain_career(career, profile):
     strong_skills = [s for s in career["skills"] if profile["skills"].get(s, 0) >= 4]
     if strong_skills:
         labels = [SKILL_BY_ID.get(s, {}).get("label", s).lower() for s in strong_skills[:3]]
-        reasons.append(f"You already bring {', '.join(labels)} — skills this role uses every week.")
+        reasons.append(f"You already bring {', '.join(labels)} â€” skills this role uses every week.")
 
     top_values = sorted(VALUES, key=lambda v: profile["values"].get(v["id"], 0), reverse=True)[:2]
     top_value_ids = [v["id"] for v in top_values]
@@ -356,7 +368,7 @@ def explain_career(career, profile):
 
     if not reasons:
         reasons.append(
-            "This is a plausible exploration path — not a perfect twin of your profile, "
+            "This is a plausible exploration path â€” not a perfect twin of your profile, "
             "but close enough to be worth a closer look."
         )
     return reasons[:4]
@@ -446,7 +458,7 @@ def generate_plan(profile, top, stage=None):
     secondary = top[1] if len(top) > 1 else None
 
     code_line = "; ".join(
-        f"{RIASEC_META[k]['label']} — {RIASEC_META[k]['short']}" for k in holland_code(profile)
+        f"{RIASEC_META[k]['label']} â€” {RIASEC_META[k]['short']}" for k in holland_code(profile)
     )
     tasks.append({
         "title": "Name the pattern, not the job",
@@ -482,7 +494,7 @@ def generate_plan(profile, top, stage=None):
         primary_title = primary["career"]["title"] if primary else "your top match"
         tasks.append({
             "title": f"Hold a second path: {secondary['career']['title']}",
-            "description": f"List three ways this role is different from {primary_title} — and "
+            "description": f"List three ways this role is different from {primary_title} â€” and "
                             f"one way it is the same. You are mapping a region, not picking a single peak.",
             "category": "exploration",
             "careerId": secondary["career"]["id"],
@@ -530,7 +542,7 @@ def generate_activities(profile, answers, top, stage=None):
             "type": "growth",
             "duration": "15 min",
             "difficulty": "Easy",
-            "prompt": f"Choose one {label.lower()} task you can practice for only 15 minutes. Do it before you feel ready, then rate your confidence before and after from 1–5.",
+            "prompt": f"Choose one {label.lower()} task you can practice for only 15 minutes. Do it before you feel ready, then rate your confidence before and after from 1â€“5.",
             "why": f"You currently rate {label.lower()} at {profile['skills'].get(weakest_skill['id'], 3)}/5. Small experiments turn a self-rating into evidence.",
             "goal": answers.get("goals") or "Build confidence in my skills",
         })
@@ -584,7 +596,7 @@ def fallback_adaptive_activity(profile, answers, ranked, history=None, feedback=
             "id": f"adaptive-{weak['id']}-{len(history)+1}",
             "title": f"Adaptive practice: {skill}",
             "type": "adaptive growth",
-            "duration": "10–20 min",
+            "duration": "10â€“20 min",
             "difficulty": difficulty,
             "prompt": f"Spend 15 minutes practicing {skill.lower()} on a tiny, concrete example related to {primary['title'] if primary else 'your goal'}. Finish with one sentence describing what became easier.",
             "why": f"Your current self-rating is {rating}/5, so Milto is targeting this improvement area with a small step instead of a large course.",
@@ -646,7 +658,7 @@ def generate_daily_content(profile, answers, ranked, day_key, completed_count=0)
         "title": "One tiny move toward your goal",
         "description": f"Choose one action that moves you toward: {goal}",
         "category": "Goal",
-        "duration": "10–20 min",
+        "duration": "10â€“20 min",
     })
 
     return {
@@ -656,87 +668,184 @@ def generate_daily_content(profile, answers, ranked, day_key, completed_count=0)
     }
 
 
+
+# Initialize Semantic Search
+try:
+    _embedder = SentenceTransformer('all-MiniLM-L6-v2')
+    _faiss_index = faiss.read_index(str(PROCESSED_DIR / "embeddings" / "career_index.faiss"))
+    with open(PROCESSED_DIR / "embeddings" / "metadata.json", "r") as f:
+        _meta = json.load(f)
+        _career_ids = _meta.get("career_ids", [])
+except Exception as e:
+    print(f"Semantic search not available: {e}")
+    _embedder = None
+    _faiss_index = None
+    _career_ids = []
+
+def semantic_search(query, k=5):
+    if not _embedder or not _faiss_index:
+        return []
+    
+    # Embed the query
+    q_emb = _embedder.encode([query])[0]
+    q_emb = q_emb / np.linalg.norm(q_emb)
+    
+    # Search FAISS
+    scores, indices = _faiss_index.search(q_emb.reshape(1, -1).astype(np.float32), k)
+    
+    results = []
+    for score, idx in zip(scores[0], indices[0]):
+        if idx < len(_career_ids):
+            career_id = _career_ids[idx]
+            # Find the career details
+            for c in CAREERS:
+                if c["id"] == career_id:
+                    results.append({"career": c, "score": float(score)})
+                    break
+    return results
+
+
+CAREER_QUERY_ALIASES = {
+    "artificial intelligence": "data scientist software engineer research scientist machine learning AI",
+    "machine learning": "data scientist software engineer research scientist artificial intelligence",
+    "renewable energy": "environmental scientist electrician urban planner sustainability clean energy",
+    "solar energy": "electrician environmental scientist renewable energy",
+    "wind energy": "environmental scientist renewable energy electrician",
+    "project management": "product manager management consultant project manager",
+    "robotics": "software engineer research scientist electrician automation",
+    "sustainability": "environmental scientist urban planner renewable energy",
+}
+
+
+def expand_career_query(query):
+    normalized = " ".join(query.lower().split())
+
+    for topic, expansion in CAREER_QUERY_ALIASES.items():
+        if topic in normalized:
+            return f"{query}. Related career terms: {expansion}"
+
+    return query
+
+
 def explore_user_path(profile, desired, feedback=None):
-    """Explore a specific career path chosen by the user"""
+    """Analyze a desired career using semantic search and profile matching."""
     desired = (desired or "").strip()[:240]
-    
-    # Simple search
-    matches = []
-    desired_lower = desired.lower()
-    for c in CAREERS:
-        title = c.get('title', '').lower()
-        summary = c.get('summary', '').lower()
-        if desired_lower in title or title in desired_lower:
-            matches.append((c, 0.9))
-        elif desired_lower in summary:
-            matches.append((c, 0.6))
-    
+
+    if not desired:
+        return {
+            "query": desired,
+            "matchedCareer": None,
+            "fit": 0,
+            "status": "needs-research",
+            "message": "Enter a career or area of interest to explore.",
+            "steps": [],
+            "difficulties": [],
+            "alternatives": [],
+        }
+
+    search_query = expand_career_query(desired)
+    matches = semantic_search(search_query, k=5)
+
+    # Reject weak matches before selecting a career.
+    if matches and float(matches[0]["score"]) < 0.35:
+        matches = []
+
     if not matches:
         return {
             "query": desired,
             "matchedCareer": None,
             "fit": 0,
             "status": "needs-research",
-            "message": "Milto could not map this interest to its current career knowledge base yet.",
+            "message": "I couldn't find a match for this in my database.",
             "steps": [],
-            "difficulties": []
+            "difficulties": [],
+            "alternatives": [],
         }
-    
-    best, score = matches[0]
-    ranked = recommend(profile, feedback or {}, limit=len(CAREERS))
-    profile_fit = next((r for r in ranked if r["career"]["id"] == best["id"]), None)
+
+    # Semantic search returns dictionaries, not tuples.
+    best = matches[0]["career"]
+    score = float(matches[0]["score"])
+
+    # Fill missing profile sections with default scores while preserving
+    # any valid values supplied by the caller.
+    defaults = empty_scores()
+    safe_profile = {}
+
+    for section, default_values in defaults.items():
+        supplied = profile.get(section, {}) if isinstance(profile, dict) else {}
+        safe_profile[section] = {
+            key: supplied.get(key, default)
+            for key, default in default_values.items()
+        }
+
+    ranked = recommend(
+        safe_profile,
+        feedback or {},
+        limit=len(CAREERS),
+    )
+
+    profile_fit = next(
+        (r for r in ranked if r["career"]["id"] == best["id"]),
+        None,
+    )
     fit = float(profile_fit["score"] if profile_fit else 0)
-    combined = clamp(round((0.55 * fit + 0.45 * min(score, 1)) * 100), 0, 100)
-    
-    gaps = skill_gaps(best, profile)
-    strengths = skill_strengths(best, profile)
-    
+
+    combined = clamp(
+        round((0.55 * fit + 0.45 * min(score, 1)) * 100),
+        0,
+        100,
+    )
+
+    gaps = skill_gaps(best, safe_profile)
+    strengths = skill_strengths(best, safe_profile)
+
     difficulties = []
     if gaps:
-        difficulties.append(f"You may need to build {', '.join(SKILL_BY_ID.get(g['skill'], {}).get('label', g['skill']).lower() for g in gaps[:3])} before you feel job-ready.")
+        labels = [
+            SKILL_BY_ID.get(g["skill"], {}).get("label", g["skill"]).lower()
+            for g in gaps[:3]
+        ]
+        difficulties.append("You may need to build " + ", ".join(labels) + ".")
+
     if best.get("education"):
         difficulties.append(best["education"])
-    difficulties.append(f"The daily work may differ from the idea of {best['title'].lower()}: {best.get('dayInLife', '')}")
-    
+
     steps = []
-    for i, g in enumerate(gaps[:4], 1):
-        label = SKILL_BY_ID.get(g["skill"], {}).get("label", g["skill"])
+    for i, gap in enumerate(gaps[:4], 1):
+        label = SKILL_BY_ID.get(gap["skill"], {}).get("label", gap["skill"])
         steps.append({
             "week": i,
             "title": f"Build {label}",
-            "action": f"Practice {label.lower()} for 3 focused sessions and produce one small piece of evidence.",
-            "target": f"Move from {g['have']}/5 toward {g['need']}/5"
+            "action": f"Practice {label.lower()} for 3 focused sessions.",
+            "target": f"Move from {gap['have']}/5 toward {gap['need']}/5",
         })
-    
-    steps.append({
-        "week": min(6, len(steps) + 1),
-        "title": f"Reality-test {best['title']}",
-        "action": f"Study one real project or job description for {best['title']} and compare the tasks with what you enjoy.",
-        "target": "Write 3 things you would enjoy, 2 difficulties, and 1 open question."
-    })
-    steps.append({
-        "week": min(8, len(steps) + 2),
-        "title": "Build proof, not intention",
-        "action": f"Create a small beginner project connected to {best['title']} and ask for feedback.",
-        "target": "One shareable artifact + one feedback conversation"
-    })
-    
-    reasons = explain_career(best, profile)
-    
+
+    alternatives = [
+        {
+            "title": item["career"]["title"],
+            "id": item["career"]["id"],
+        }
+        for item in matches[1:4]
+    ]
+
     return {
         "query": desired,
         "matchedCareer": best,
         "semanticScore": round(score, 4),
         "fit": combined,
         "profileFit": round(fit * 100),
-        "status": "strong" if combined >= 70 else "possible" if combined >= 50 else "stretch",
-        "reasons": reasons,
+        "status": (
+            "strong" if combined >= 70
+            else "possible" if combined >= 50
+            else "stretch"
+        ),
+        "reasons": explain_career(best, safe_profile),
         "strengths": strengths,
         "gaps": gaps,
         "difficulties": difficulties[:4],
         "steps": steps[:6],
-        "alternatives": [{"title": c["title"], "id": c["id"]} for c, sc in matches[1:4]],
-        "disclaimer": "This is a pathway analysis, not a prediction of success."
+        "alternatives": alternatives,
+        "disclaimer": "This is a pathway analysis, not a prediction of success.",
     }
 
 

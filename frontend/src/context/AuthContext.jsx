@@ -20,14 +20,14 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (username, password) => {
-    const response = await authAPI.login(username, password);
+  const login = async (email, password) => {
+    const response = await authAPI.login(email, password);
     setUser(response.data);
     return response.data;
   };
 
-  const register = async (username, password) => {
-    const response = await authAPI.register(username, password);
+  const register = async (email, password) => {
+    const response = await authAPI.register(email, password);
     setUser(response.data);
     return response.data;
   };

@@ -1,0 +1,146 @@
+[
+  {
+    "id": "aau",
+    "name": "Addis Ababa University",
+    "type": "public",
+    "location": "Addis Ababa",
+    "founded": 1950,
+    "ranking": 1,
+    "website": "www.aau.edu.et"
+  },
+  {
+    "id": "aait",
+    "name": "Addis Ababa Institute of Technology",
+    "type": "public",
+    "location": "Addis Ababa",
+    "founded": 1953,
+    "ranking": 2,
+    "website": "www.aait.edu.et"
+  },
+  {
+    "id": "bdu",
+    "name": "Bahir Dar University",
+    "type": "public",
+    "location": "Bahir Dar",
+    "founded": 2001,
+    "ranking": 3,
+    "website": "www.bdu.edu.et"
+  },
+  {
+    "id": "hu",
+    "name": "Hawassa University",
+    "type": "public",
+    "location": "Hawassa",
+    "founded": 1999,
+    "ranking": 4,
+    "website": "www.hu.edu.et"
+  },
+  {
+    "id": "mu",
+    "name": "Mekelle University",
+    "type": "public",
+    "location": "Mekelle",
+    "founded": 1991,
+    "ranking": 5,
+    "website": "www.mu.edu.et"
+  },
+  {
+    "id": "ju",
+    "name": "Jimma University",
+    "type": "public",
+    "location": "Jimma",
+    "founded": 1999,
+    "ranking": 6,
+    "website": "www.ju.edu.et"
+  },
+  {
+    "id": "uog",
+    "name": "University of Gondar",
+    "type": "public",
+    "location": "Gondar",
+    "founded": 1954,
+    "ranking": 7,
+    "website": "www.uog.edu.et"
+  },
+  {
+    "id": "haramaya",
+    "name": "Haramaya University",
+    "type": "public",
+    "location": "Haramaya",
+    "founded": 1954,
+    "ranking": 8,
+    "website": "www.haramaya.edu.et"
+  },
+  {
+    "id": "amu",
+    "name": "Arba Minch University",
+    "type": "public",
+    "location": "Arba Minch",
+    "founded": 1986,
+    "ranking": 9,
+    "website": "www.amu.edu.et"
+  },
+  {
+    "id": "astu",
+    "name": "Adama Science and Technology University",
+    "type": "public",
+    "location": "Adama",
+    "founded": 1993,
+    "ranking": 10,
+    "website": "www.astu.edu.et"
+  },
+  {
+    "id": "wku",
+    "name": "Wolkite University",
+    "type": "public",
+    "location": "Wolkite",
+    "founded": 2010,
+    "ranking": 11,
+    "website": "www.wku.edu.et"
+  },
+  {
+    "id": "ddu",
+    "name": "Dire Dawa University",
+    "type": "public",
+    "location": "Dire Dawa",
+    "founded": 2006,
+    "ranking": 12,
+    "website": "www.ddu.edu.et"
+  },
+  {
+    "id": "smu",
+    "name": "St. Mary's University",
+    "type": "private",
+    "location": "Addis Ababa",
+    "founded": 1998,
+    "ranking": 1,
+    "website": "www.smuc.edu.et"
+  },
+  {
+    "id": "uu",
+    "name": "Unity University",
+    "type": "private",
+    "location": "Addis Ababa",
+    "founded": 1991,
+    "ranking": 2,
+    "website": "www.unity.edu.et"
+  },
+  {
+    "id": "au",
+    "name": "Admas University",
+    "type": "private",
+    "location": "Addis Ababa",
+    "founded": 1998,
+    "ranking": 3,
+    "website": "www.admas.edu.et"
+  },
+  {
+    "id": "rvu",
+    "name": "Rift Valley University",
+    "type": "private",
+    "location": "Addis Ababa",
+    "founded": 2001,
+    "ranking": 4,
+    "website": "www.rvu.edu.et"
+  }
+]

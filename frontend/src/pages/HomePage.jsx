@@ -71,7 +71,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3 justify-center">
             <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
             <span className="text-sm text-gray-400">
-              Backend running on :5000 • AI: Groq • 4,055 careers loaded
+              
             </span>
           </div>
         </div>
@@ -91,3 +91,4 @@ function FeatureCard({ icon, title, description }) {
     </div>
   );
 }
+

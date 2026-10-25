@@ -57,18 +57,14 @@ CORS(
     max_age=3600,
 )
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-AI_MODEL = os.environ.get("MILTO_AI_MODEL", "llama-3.3-70b-versatile")
-
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+ANTHROPIC_API_KEY = GROQ_API_KEY  # Compatibility with existing helper functions
+AI_MODEL = os.environ.get("MILTO_AI_MODEL", "openai/gpt-oss-20b")
 
 def get_api_type():
-    if not ANTHROPIC_API_KEY:
+    if not GROQ_API_KEY:
         return "none"
-    if ANTHROPIC_API_KEY.startswith('gsk_'):
-        return "groq"
-    if ANTHROPIC_API_KEY.startswith('sk-'):
-        return "openai"
-    return "anthropic"
+    return "groq"
 
 
 print("=" * 60)
@@ -76,7 +72,6 @@ print("MILTO AI DEBUG")
 print("=" * 60)
 print(f"ANTHROPIC_API_KEY: {'SET' if ANTHROPIC_API_KEY else 'NOT SET'}")
 if ANTHROPIC_API_KEY:
-    print(f"  Key prefix: {ANTHROPIC_API_KEY[:10]}...")
     print(f"  Detected API: {get_api_type()}")
 print(f"AI_MODEL: {AI_MODEL}")
 print(f"requests: {'OK' if requests else 'MISSING'}")
@@ -138,34 +133,51 @@ def get_latest_or_error(user):
 def _groq_text(system_prompt, user_payload, max_tokens=800):
     if not ANTHROPIC_API_KEY or not requests:
         return None
-    if isinstance(user_payload, dict):
-        user_content = json.dumps(user_payload, ensure_ascii=False)
-    else:
-        user_content = str(user_payload)
+
+    user_content = (
+        json.dumps(user_payload, ensure_ascii=False)
+        if isinstance(user_payload, dict)
+        else str(user_payload)
+    )
+
     try:
         resp = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {ANTHROPIC_API_KEY}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             },
             json={
-                "model": AI_MODEL or "llama-3.3-70b-versatile",
+                "model": AI_MODEL or "openai/gpt-oss-20b",
                 "messages": [
                     {"role": "system", "content": system_prompt[:4000]},
-                    {"role": "user", "content": user_content[:4000]}
+                    {"role": "user", "content": user_content[:8000]},
                 ],
-                "max_tokens": max_tokens,
-                "temperature": 0.7
+                "max_completion_tokens": max(256, max_tokens),
             },
-            timeout=30
+            timeout=60,
         )
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        print(f"Groq error: {e}")
+        result = resp.json()
+        choices = result.get("choices") or []
+        if not choices:
+            print("Groq error: response contained no choices.")
+            return None
+
+        message = choices[0].get("message") or {}
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+
+        print(
+            "Groq returned empty text; finish_reason:",
+            choices[0].get("finish_reason"),
+        )
         return None
 
+    except Exception as e:
+        print(f"Groq error: {type(e).__name__}: {e}")
+        return None
 
 def _openai_text(system_prompt, user_payload, max_tokens=800):
     if not ANTHROPIC_API_KEY or not requests:
@@ -278,39 +290,37 @@ def index():
 @app.route("/api/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip()
     password = data.get("password") or ""
 
-    if not 2 <= len(username) <= 60:
-        return error("Username must be between 2 and 60 characters.")
-    if not re.match(r"^[\w .@+-]+$", username, re.UNICODE):
-        return error("Username contains unsupported characters.")
+    if not 5 <= len(email) <= 120 or "@" not in email:
+        return error("Valid email address required.")
     if len(password) < 8 or len(password) > 200:
         return error("Password must be between 8 and 200 characters.")
-    if db.get_user_by_username(username):
-        return error("That username is taken.")
+    if db.get_user_by_email(email):
+        return error("That email is already registered.")
 
-    user_id = db.create_user(username, generate_password_hash(password))
+    user_id = db.create_user(email, generate_password_hash(password))
     session.clear()
     session["user_id"] = user_id
     session.permanent = True
-    return jsonify({"id": user_id, "username": username})
+    return jsonify({"id": user_id, "email": email})
 
 
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip()
     password = data.get("password") or ""
 
-    user = db.get_user_by_username(username)
+    user = db.get_user_by_email(email)
     if not user or not check_password_hash(user["password_hash"], password):
-        return error("Incorrect username or password.", 401)
+        return error("Incorrect email or password.", 401)
 
     session.clear()
     session["user_id"] = user["id"]
     session.permanent = True
-    return jsonify({"id": user["id"], "username": user["username"]})
+    return jsonify({"id": user["id"], "email": user["email"]})
 
 
 @app.route("/api/logout", methods=["POST"])
@@ -328,11 +338,34 @@ def me():
     return jsonify({
         "user": {
             "id": user["id"],
-            "username": user["username"],
-            "created_at": user["created_at"]
+            "email": user["email"],
+            "created_at": user["created_at"],
+            "display_name": db.get_user_profile(user["id"]).get("display_name", "")
         },
         "settings": settings,
     })
+
+
+@app.route("/api/profile", methods=["GET", "PUT"])
+def profile_endpoint():
+    user = require_login()
+    if not user:
+        return error("Log in first.", 401)
+    if request.method == "GET":
+        return jsonify({"profile": db.get_user_profile(user["id"]), "user": {
+            "id": user["id"], "email": user["email"], "created_at": user["created_at"]
+        }})
+
+    data = request.get_json(silent=True) or {}
+    current = db.get_user_profile(user["id"])
+    display_name = str(data.get("display_name", current.get("display_name", ""))).strip()[:80]
+    study_stage = str(data.get("study_stage", current.get("study_stage", ""))).strip()[:80]
+    goals = str(data.get("goals", current.get("goals", ""))).strip()[:1000]
+    interests = str(data.get("interests", current.get("interests", ""))).strip()[:1000]
+    profile = {"display_name": display_name, "study_stage": study_stage,
+               "goals": goals, "interests": interests}
+    db.update_user_profile(user["id"], profile)
+    return jsonify({"ok": True, "profile": profile})
 
 
 # ============================================================
@@ -626,6 +659,127 @@ def submit_feedback():
 
 
 # ============================================================
+# ROUTES: BRUTAL HONESTY & LIMITATIONS
+# ============================================================
+
+@app.route("/api/limitations", methods=["POST"])
+def analyze_limitations():
+    """Analyze gaps between user profile and dream career"""
+    user = require_login()
+    if not user:
+        return error("Log in first.", 401)
+    
+    data = request.get_json(silent=True) or {}
+    target_career_query = str(data.get("career") or "").strip()[:100]
+    
+    if not target_career_query:
+        return error("Tell me your dream career.")
+    
+    latest, err = get_latest_or_error(user)
+    if err: return err
+
+    # Use the existing career changer logic to find the career
+    from modules import career_changer
+    careers = career_changer._load_careers()
+    target_career = career_changer._find_career(target_career_query, careers)
+    
+    if not target_career:
+        return error("Career not found in our database.")
+
+    user_profile = latest["profile"]
+    user_skills = user_profile.get("skills", {})
+    user_interests = user_profile.get("interests", {})
+    
+    # Calculate limitations
+    limitations = []
+    
+    # 1. Skill gaps
+    career_skills = target_career.get("skills", [])
+    for skill in career_skills:
+        user_level = user_skills.get(skill, 1)
+        if user_level < 4:
+            limitations.append({
+                "type": "skill",
+                "area": skill,
+                "current": user_level,
+                "required": 4,
+                "severity": "high" if user_level <= 2 else "medium",
+                "message": f"Your {skill} is at {user_level}/5. You need at least 4/5."
+            })
+    
+    # 2. Interest mismatch (RIASEC)
+    career_riasec = target_career.get("riasec", {})
+    for dim, required_score in career_riasec.items():
+        if required_score >= 4: # Career requires high interest in this
+            user_score = user_interests.get(dim, 50) / 20 # Normalize to 1-5
+            if user_score < 3:
+                limitations.append({
+                    "type": "interest",
+                    "area": dim,
+                    "current": round(user_score, 1),
+                    "required": 4,
+                    "severity": "high",
+                    "message": f"Your interest in this area is low ({round(user_score,1)}/5). You might find the daily work boring."
+                })
+
+    # Sort by severity
+    limitations.sort(key=lambda x: (x["severity"] == "high", x["current"]), reverse=True)
+    
+    return jsonify({
+        "target_career": target_career.get("title"),
+        "readiness_score": max(0, 100 - (len(limitations) * 10)),
+        "limitations": limitations[:8], # Top 8
+        "message": "Fix these to be ready." if limitations else "You have no major limitations! Start applying."
+    })
+
+
+@app.route("/api/coach/brutal", methods=["POST"])
+def coach_brutal():
+    """Brutal Honesty Coach"""
+    user = require_login()
+    if not user:
+        return error("Log in first.", 401)
+    
+    data = request.get_json(silent=True) or {}
+    message = str(data.get("message") or "").strip()[:2000]
+    intensity = data.get("intensity", "direct") # gentle, direct, brutal
+    
+    latest, err = get_latest_or_error(user)
+    if err: return err
+    
+    ranked = engine.recommend(latest["profile"], db.get_feedback(user["id"]), limit=3)
+    top_career = ranked[0]["career"]["title"] if ranked else "Unknown"
+    
+    # Build the persona prompt
+    base_prompt = "You are Milto, an AI career coach. "
+    if intensity == "brutal":
+        persona = "You are ruthless, blunt, and intolerant of excuses. Do not sugarcoat. Point out exactly what the user is doing wrong or what they lack. Use harsh words to push them to action. Be direct and aggressive but not insulting."
+    elif intensity == "direct":
+        persona = "You are professional, direct, and no-nonsense. Give straight facts. Do not use fluff. Focus on action."
+    else:
+        persona = "You are warm, encouraging, and supportive. Frame challenges as opportunities."
+
+    system_prompt = base_prompt + persona + " Do not use emojis. Keep it under 3 paragraphs."
+    
+    context = {
+        "top_career": top_career,
+        "user_skills": latest["profile"].get("skills", {}),
+        "user_question": message
+    }
+
+    reply = _ai_text(system_prompt, context, 400)
+    
+    if not reply:
+        # Fallback based on intensity
+        if intensity == "brutal":
+            reply = f"Your top career is {top_career}. Stop asking questions and start doing the work. You lack skills. Fix them."
+        else:
+            reply = f"Your top career is {top_career}. Focus on building the skills you lack."
+            
+    db.add_chat_message(user["id"], "assistant", reply)
+    return jsonify({"reply": reply, "intensity": intensity})
+
+# ============================================================
 # ROUTES: EXPLORE PATH
 # ============================================================
 @app.route("/api/explore-path", methods=["POST"])
@@ -702,15 +856,33 @@ def coach():
     message = str(data.get("message") or "").strip()[:2000]
     if not message:
         return error("Empty message.")
-    latest, err = get_latest_or_error(user)
-    if err:
-        return err
-    ranked = engine.recommend(latest["profile"], db.get_feedback(user["id"]), limit=5)
+    latest = db.get_latest_assessment(user["id"])
+    profile = latest["profile"] if latest else engine.empty_scores()
+    answers = latest["answers"] if latest else {}
+    ranked = engine.recommend(profile, db.get_feedback(user["id"]), limit=5) if latest else []
     db.add_chat_message(user["id"], "user", message)
-    context = build_coach_context(latest["profile"], latest["answers"], ranked, message)
-    system_prompt = """You are Milto, a warm and practical career exploration coach for Ethiopian university students.
-Use profile data as one signal, not destiny. Suggest small experiments. Be specific.
-Reference Ethiopian universities and job market when relevant. Keep responses concise (2-4 paragraphs)."""
+    context = build_coach_context(profile, answers, ranked, message)
+    
+    
+    system_prompt = """You are Milto AI, a personalized career exploration coach.
+
+IMPORTANT:
+- Pay attention to the career the user selected in Career Lab.
+- If the user selected Nurse, give advice specifically about nursing.
+- Explain relevant skills, education pathways, responsibilities,
+  and practical next steps for that career.
+- Never switch to software engineering or another career unless
+  the user asks about it.
+- Answer the user's actual question first.
+- Do not automatically generate a 4-week plan.
+- Only create a detailed plan if the user explicitly requests one.
+- Keep answers friendly, clear, relevant, and concise.
+- Use Ethiopian education and career information when relevant.
+- If the selected career is not provided in the context, ask
+  which career the user wants to explore rather than guessing.
+"""
+
+
     reply = None
     source = "local-ai"
     if ANTHROPIC_API_KEY and requests:
@@ -722,12 +894,20 @@ Reference Ethiopian universities and job market when relevant. Keep responses co
         except Exception as e:
             print(f"Coach AI error: {e}")
     if not reply:
-        top = ranked[0]["career"]["title"] if ranked else "a career you want to test"
-        reply = (
-            f"Your current strongest Milto direction is **{top}**. "
-            f"If you want to explore a different career, tell me specifically - "
-            f"I can map the gap and build a practical bridge plan."
-        )
+        lower_message = message.lower()
+        if any(term in lower_message for term in ("study habit", "study habits", "study better", "studying", "focus", "remember what i learn")):
+            reply = ("Here are three practical study habits:\n\n"
+                     "1. **Use focused blocks:** study for 25 minutes, then take a 5-minute break. Put your phone away during the block.\n"
+                     "2. **Test yourself:** close your notes and explain the idea from memory, or answer practice questions. This works better than rereading alone.\n"
+                     "3. **Review over time:** revisit the material later the same day, the next day, and again a few days later.\n\n"
+                     "Start with one subject today and track what you completed.")
+        elif any(term in lower_message for term in ("hello", "hi", "hey")) and len(message.split()) <= 3:
+            reply = "Hi! What would you like help with today? I can help with study strategies, building skills, exploring careers, or making a practical plan."
+        else:
+          reply = (
+        "I'm having trouble connecting to my AI service right now. "
+        "Please try sending your message again in a moment."
+    )
         source = "fallback"
     db.add_chat_message(user["id"], "assistant", reply)
     return jsonify({"reply": reply, "source": source})
@@ -919,7 +1099,98 @@ def list_traits():
 
 
 
+
+# ============================================================
+# ROUTES: NOTIFICATIONS
+# ============================================================
+@app.route("/api/notifications", methods=["GET"])
+def get_notifications():
+    """Get pending notifications for the user"""
+    user = require_login()
+    if not user:
+        return error("Log in first.", 401)
+
+    latest = db.get_latest_assessment(user["id"])
+    if not latest:
+        return jsonify({"notifications": [], "count": 0})
+
+    notifications = []
+    dismissed = db.get_dismissed_notifications(user["id"])
+
+    # 1. Check today's daily tasks
+    from datetime import date
+    today = date.today().isoformat()
+    daily = db.get_daily(user["id"], today)
+
+    if daily:
+        done_tasks = daily.get("done", {})
+        plan = daily.get("plan", [])
+        pending = [t for t in plan if not done_tasks.get(t.get("id"))]
+        if pending:
+            notifications.append({
+                "id": f"daily-pending-{today}",
+                "type": "activity",
+                "title": f"You have {len(pending)} pending tasks today",
+                "body": f"Complete: {pending[0].get('title')}",
+                "icon": "📋",
+                "action_url": "/dashboard#daily-tasks",
+                "created_at": today
+            })
+
+    # 2. Check pending activities
+    activities = latest.get("activities", [])
+    done_activities = latest.get("activity_done", {})
+    pending_activities = [a for a in activities if not done_activities.get(a.get("id"))]
+    if pending_activities:
+        notifications.append({
+            "id": f"activity-pending-{latest['id']}",
+            "type": "activity",
+            "title": f"{len(pending_activities)} activities waiting",
+            "body": pending_activities[0].get("title", "New activity"),
+            "icon": "🎯",
+            "action_url": "/dashboard#activities",
+            "created_at": today
+        })
+
+    # 3. Weekly check-in reminder
+    from datetime import datetime, timedelta
+    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    reflections = db.get_reflections(user["id"], 1)
+    if not reflections or (reflections and reflections[0].get("created_at", "") < week_ago):
+        notifications.append({
+            "id": f"reflection-reminder-{today}",
+            "type": "reflection",
+            "title": "Time for a weekly reflection",
+            "body": "Take 5 minutes to write what you learned this week.",
+            "icon": "✍️",
+            "action_url": "/reflections",
+            "created_at": today
+        })
+
+    notifications = [n for n in notifications if n["id"] not in dismissed]
+    return jsonify({
+        "notifications": notifications,
+        "count": len(notifications)
+    })
+
+
+@app.route("/api/notifications/dismiss", methods=["POST"])
+def dismiss_notification():
+    """Mark a notification as dismissed"""
+    user = require_login()
+    if not user:
+        return error("Log in first.", 401)
+
+    data = request.get_json(silent=True) or {}
+    notification_id = data.get("id")
+    if not notification_id:
+        return error("Missing notification ID.")
+
+    db.dismiss_notification(user["id"], str(notification_id)[:160])
+    return jsonify({"ok": True, "dismissed": notification_id})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
     debug = os.environ.get("MILTO_DEBUG", "1") == "1"
-    app.run(host="127.0.0.1", port=port, debug=debug)
+    app.run(host="127.0.0.1", port=port, debug=debug, use_reloader=False)

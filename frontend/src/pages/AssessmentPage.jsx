@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { careerAPI, assessmentAPI } from '../api/client';
@@ -14,23 +14,31 @@ const SECTIONS = [
 
 export default function AssessmentPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [meta, setMeta] = useState(null);
   const [answers, setAnswers] = useState({});
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [hasSavedResults, setHasSavedResults] = useState(false);
+  const [checkingSavedResults, setCheckingSavedResults] = useState(true);
 
   useEffect(() => {
     loadMeta();
+    let active = true;
+    assessmentAPI.getResults()
+      .then((response) => { if (active) setHasSavedResults(Boolean(response.data?.assessment)); })
+      .catch(() => { if (active) setHasSavedResults(false); })
+      .finally(() => { if (active) setCheckingSavedResults(false); });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
-    if (!user && !loading) {
+    if (!authLoading && !user) {
       navigate('/login');
     }
-  }, [user, loading]);
+  }, [user, authLoading, navigate]);
 
   const loadMeta = async () => {
     try {
@@ -113,13 +121,12 @@ export default function AssessmentPage() {
     <div className="min-h-screen max-w-3xl mx-auto px-6 py-8">
       {/* Header */}
       <div className="mb-8">
-        <button
-          onClick={() => navigate('/')}
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6"
-        >
-          <ArrowLeftIcon className="w-4 h-4" />
-          <span className="text-sm">Exit</span>
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <button onClick={() => navigate('/dashboard')} className="inline-flex items-center gap-2 text-gray-400 hover:text-white">
+            <ArrowLeftIcon className="w-4 h-4" /><span className="text-sm">Back to dashboard</span>
+          </button>
+          {hasSavedResults && !checkingSavedResults && <button onClick={() => navigate('/dashboard')} className="btn btn-secondary text-sm">View previous results</button>}
+        </div>
 
         <div className="flex justify-between items-end mb-4">
           <div>
@@ -248,3 +255,4 @@ function QuestionItem({ question, value, onChange, stages, isLast }) {
     </div>
   );
 }
+

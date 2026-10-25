@@ -222,7 +222,25 @@ export default function CareerLabPage() {
           )}
 
           <div className="flex gap-3 flex-wrap">
-            <Link to="/coach" className="btn btn-primary">Talk to AI Coach →</Link>
+            <button
+              onClick={() => {
+                const careerName = result.matchedCareer?.title || result.query || query;
+                const prompt = `Act as my personalized Milto career coach. Help me build skills for ${careerName}.
+
+Career Lab assessment:
+- Fit score: ${result.fit ?? "Not assessed"}%
+- Status: ${result.status || "Not assessed"}
+- Strengths: ${result.strengths?.join(", ") || "Not yet identified"}
+- Skill gaps: ${result.gaps?.map(g => `${g.skill} (current ${g.have}, target ${g.need})`).join("; ") || "Not yet assessed"}
+- Suggested steps: ${result.steps?.map(s => `Week ${s.week}: ${s.title} ? ${s.action}`).join("; ") || "Not available"}
+
+Create a practical weekly development plan with priorities, exercises, milestones, and ways to measure progress. Treat missing information as unknown, not zero. These results are estimates. Ask focused questions if needed. Be supportive, direct, and specific.`;
+                navigate("/coach", { state: { initialPrompt: prompt } });
+              }}
+              className="btn btn-primary"
+            >
+              Build My Personal Development Plan ?
+            </button>
             <button
               onClick={() => { setResult(null); setQuery(''); }}
               className="btn btn-secondary"
