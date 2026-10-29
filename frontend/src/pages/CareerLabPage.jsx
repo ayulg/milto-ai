@@ -1,4 +1,5 @@
-﻿import { useState, useEffect } from 'react';
+import { API_BASE } from '../config.js';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { careerAPI } from '../api/client';
@@ -271,7 +272,7 @@ function EthiopianContext({ careerId }) {
       setLoading(false);
       return;
     }
-    fetch(`http://localhost:5000/api/ethiopian/career/${careerId}`)
+    fetch(`${API_BASE}/api/ethiopian/career/${careerId}`)
       .then(r => r.json())
       .then(data => setCtx(data.context || null))
       .catch(() => setCtx(null))

@@ -1,3 +1,4 @@
+import { API_BASE } from '../config.js';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -10,7 +11,7 @@ export default function LimitationPage() {
     if (!career) return;
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/limitations', {
+      const res = await fetch(`${API_BASE}/api/limitations`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

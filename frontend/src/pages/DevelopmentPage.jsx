@@ -1,3 +1,4 @@
+import { API_BASE } from '../config.js';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +19,7 @@ export default function DevelopmentPage() {
     if (!q.trim()) return;
     setLoading(true); setError(''); setPlan(null);
     try {
-      const res = await fetch('http://localhost:5000/api/development/plan', {
+      const res = await fetch(`${API_BASE}/api/development/plan`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ goal: q }),

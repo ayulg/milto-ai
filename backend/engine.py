@@ -1,4 +1,4 @@
-﻿"""
+"""
 Core engine for Milto AI
 Handles scoring, recommendations, and analysis
 """
@@ -14,8 +14,12 @@ except:
     _ml_model = None
     _ml_scaler = None
 
-import faiss
-from sentence_transformers import SentenceTransformer
+try:
+    import faiss
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    faiss = None
+    SentenceTransformer = None
 import os
 from pathlib import Path
 

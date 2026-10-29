@@ -1,3 +1,4 @@
+import { API_BASE } from '../config.js';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +19,7 @@ export default function CareerChangePage() {
     if (!current.trim() || !target.trim()) return;
     setLoading(true); setError(''); setResult(null);
     try {
-      const res = await fetch('http://localhost:5000/api/career-change', {
+      const res = await fetch(`${API_BASE}/api/career-change`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ current, target }),

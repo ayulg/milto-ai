@@ -3,8 +3,7 @@ import axios from 'axios';
 // Use the SAME domain as the browser URL to avoid cookie issues
 // If frontend is on http://localhost:5173, use http://localhost:5000
 // If frontend is on http://127.0.0.1:5173, use http://127.0.0.1:5000
-const API_HOST = typeof window !== 'undefined' && window.location.hostname === '127.0.0.1' ? '127.0.0.1' : 'localhost';
-const API_BASE = `http://${API_HOST}:5000`;
+import { API_BASE } from '../config.js';
 
 const api = axios.create({
   baseURL: API_BASE,
