@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 *.so
@@ -10,9 +10,9 @@ env/
 
 # Environment
 .env
-.env.local
-.env.production
-.env.*.local
+.env.*
+!.env.example
+**/.env.*
 
 # Database
 *.db
@@ -67,9 +67,9 @@ startup_log.txt
 file.txt
 *.broken
 *.bak
-fix_*.py
-check_*.py
-add_*.py
 test_*.ps1
 _endpoint.txt
 _ep.txt
+
+# Allow example environment templates
+!**/.env.example

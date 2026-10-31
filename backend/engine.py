@@ -709,6 +709,102 @@ def semantic_search(query, k=5):
     return results
 
 
+
+# ============================================================
+# UNIFIED CAREER DATABASE — 4,055 OCCUPATIONS
+# Separate from the original 28 detailed career profiles.
+# ============================================================
+
+UNIFIED_DIR = PROCESSED_DIR / "embeddings_unified_v1"
+UNIFIED_DATA_FILE = PROCESSED_DIR / "unified_careers_v2.json"
+
+_unified_faiss_index = None
+_unified_career_ids = []
+_unified_careers_by_id = {}
+
+try:
+    if _embedder is None:
+        raise RuntimeError("Original embedding model is unavailable.")
+
+    _unified_faiss_index = faiss.read_index(
+        str(UNIFIED_DIR / "career_index.faiss")
+    )
+
+    with open(UNIFIED_DIR / "metadata.json", "r", encoding="utf-8") as f:
+        _unified_meta = json.load(f)
+
+    _unified_career_ids = _unified_meta.get("career_ids", [])
+
+    with open(UNIFIED_DATA_FILE, "r", encoding="utf-8") as f:
+        _unified_data = json.load(f)
+
+    if isinstance(_unified_data, dict):
+        _unified_records = (
+            _unified_data.get("careers")
+            or _unified_data.get("occupations")
+            or []
+        )
+    else:
+        _unified_records = _unified_data
+
+    _unified_careers_by_id = {
+        str(c["id"]): c
+        for c in _unified_records
+        if isinstance(c, dict) and c.get("id") is not None
+    }
+
+    if _unified_faiss_index.ntotal != len(_unified_career_ids):
+        raise ValueError("Unified FAISS index and metadata counts differ.")
+
+    print(
+        f"Unified career search loaded: "
+        f"{len(_unified_careers_by_id)} careers, "
+        f"{_unified_faiss_index.ntotal} vectors."
+    )
+
+except Exception as e:
+    print(f"Unified career search unavailable: {e}")
+    _unified_faiss_index = None
+    _unified_career_ids = []
+    _unified_careers_by_id = {}
+
+
+def semantic_search_unified(query, k=10):
+    """Search the expanded ESCO/O*NET career database."""
+
+    if not query or not _embedder or _unified_faiss_index is None:
+        return []
+
+    try:
+        query_embedding = _embedder.encode([query])[0]
+        query_embedding = query_embedding / np.linalg.norm(query_embedding)
+
+        scores, indices = _unified_faiss_index.search(
+            query_embedding.reshape(1, -1).astype(np.float32),
+            min(k, _unified_faiss_index.ntotal),
+        )
+
+        results = []
+
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < 0 or idx >= len(_unified_career_ids):
+                continue
+
+            career_id = str(_unified_career_ids[idx])
+            career = _unified_careers_by_id.get(career_id)
+
+            if career:
+                results.append({
+                    "career": career,
+                    "score": float(score),
+                })
+
+        return results
+
+    except Exception as e:
+        print(f"Unified semantic search error: {e}")
+        return []
+
 CAREER_QUERY_ALIASES = {
     "artificial intelligence": "data scientist software engineer research scientist machine learning AI",
     "machine learning": "data scientist software engineer research scientist artificial intelligence",
@@ -732,25 +828,35 @@ def expand_career_query(query):
 
 
 def explore_user_path(profile, desired, feedback=None):
-    """Analyze a desired career using semantic search and profile matching."""
+    """UNIFIED_DISCOVERY_V1: Explore occupations with honest fit assessment."""
     desired = (desired or "").strip()[:240]
 
     if not desired:
         return {
             "query": desired,
             "matchedCareer": None,
-            "fit": 0,
+            "fit": None,
+            "profileFit": None,
+            "fitAssessed": False,
+            "resultType": "discovery",
             "status": "needs-research",
             "message": "Enter a career or area of interest to explore.",
             "steps": [],
             "difficulties": [],
+            "strengths": [],
+            "gaps": [],
             "alternatives": [],
         }
 
     search_query = expand_career_query(desired)
-    matches = semantic_search(search_query, k=5)
 
-    # Reject weak matches before selecting a career.
+    # Search the expanded database first. Keep the original search
+    # available as a fallback if the unified index is unavailable.
+    matches = semantic_search_unified(search_query, k=10)
+
+    if not matches:
+        matches = semantic_search(search_query, k=5)
+
     if matches and float(matches[0]["score"]) < 0.35:
         matches = []
 
@@ -758,20 +864,115 @@ def explore_user_path(profile, desired, feedback=None):
         return {
             "query": desired,
             "matchedCareer": None,
-            "fit": 0,
+            "fit": None,
+            "profileFit": None,
+            "fitAssessed": False,
+            "resultType": "discovery",
             "status": "needs-research",
-            "message": "I couldn't find a match for this in my database.",
+            "message": "I couldn't find a sufficiently relevant career match in my database.",
             "steps": [],
             "difficulties": [],
+            "strengths": [],
+            "gaps": [],
             "alternatives": [],
         }
 
-    # Semantic search returns dictionaries, not tuples.
-    best = matches[0]["career"]
-    score = float(matches[0]["score"])
+    def normalize_title(title):
+        return " ".join(
+            "".join(
+                ch.lower() if ch.isalnum() else " "
+                for ch in str(title)
+            ).split()
+        )
 
-    # Fill missing profile sections with default scores while preserving
-    # any valid values supplied by the caller.
+    # Search the ranked results for an exact detailed-profile match.
+    # This allows a matching profile at rank 2 or later to be selected.
+    detailed_by_title = {
+        normalize_title(career.get("title", "")): career
+        for career in CAREERS
+    }
+
+    best_index = 0
+    best_record = matches[0]["career"]
+    best = None
+
+    for index, item in enumerate(matches):
+        candidate = item["career"]
+        candidate_title = normalize_title(candidate.get("title", ""))
+
+        exact_profile = detailed_by_title.get(candidate_title)
+
+        if exact_profile is None:
+            candidate_id = candidate.get("id")
+            if candidate_id in CAREER_BY_ID:
+                exact_profile = CAREER_BY_ID[candidate_id]
+
+        if exact_profile is not None:
+            best_index = index
+            best_record = candidate
+            best = exact_profile
+            break
+
+    score = float(matches[best_index]["score"])
+
+    alternatives = []
+    seen_titles = {normalize_title(best_record.get("title", ""))}
+
+    alternative_matches = matches[:best_index] + matches[best_index + 1:]
+
+    for item in alternative_matches:
+        career = item.get("career", {})
+        title = career.get("title", "")
+        normalized = normalize_title(title)
+
+        if not title or normalized in seen_titles:
+            continue
+
+        seen_titles.add(normalized)
+        alternatives.append({
+            "title": title,
+            "id": career.get("id"),
+            "source": career.get("source"),
+        })
+
+        if len(alternatives) == 3:
+            break
+
+    # No exact detailed profile: provide career discovery information,
+    # but do not calculate or imply personal fit.
+    if best is None:
+        discovery_career = dict(best_record)
+        discovery_career["summary"] = (
+            discovery_career.get("summary")
+            or discovery_career.get("description")
+            or "A detailed description is not available."
+        )
+
+        return {
+            "query": desired,
+            "matchedCareer": discovery_career,
+            "semanticScore": round(score, 4),
+            "relevance": round(score * 100),
+            "fit": None,
+            "profileFit": None,
+            "fitAssessed": False,
+            "resultType": "discovery",
+            "status": "discovery",
+            "reasons": [],
+            "strengths": [],
+            "gaps": [],
+            "availableSkills": discovery_career.get("skills", []),
+            "difficulties": [],
+            "steps": [],
+            "alternatives": alternatives,
+            "disclaimer": (
+                "Search relevance indicates how closely this occupation "
+                "matches your search. It is not a personal-fit assessment. "
+                "A detailed assessment profile is not available for this occupation yet."
+            ),
+        }
+
+    # An exact detailed profile exists. Preserve the original assessment.
     defaults = empty_scores()
     safe_profile = {}
 
@@ -824,20 +1025,14 @@ def explore_user_path(profile, desired, feedback=None):
             "target": f"Move from {gap['have']}/5 toward {gap['need']}/5",
         })
 
-    alternatives = [
-        {
-            "title": item["career"]["title"],
-            "id": item["career"]["id"],
-        }
-        for item in matches[1:4]
-    ]
-
     return {
         "query": desired,
         "matchedCareer": best,
         "semanticScore": round(score, 4),
         "fit": combined,
         "profileFit": round(fit * 100),
+        "fitAssessed": True,
+        "resultType": "assessed",
         "status": (
             "strong" if combined >= 70
             else "possible" if combined >= 50
@@ -854,19 +1049,34 @@ def explore_user_path(profile, desired, feedback=None):
 
 
 def ai_context_for_path(profile, path_result):
-    """Prepare context for AI"""
+    """Prepare AI context without confusing discovery with personal fit."""
     c = path_result.get("matchedCareer") or {}
+    fit_assessed = bool(path_result.get("fitAssessed"))
+
     return {
         "desired_interest": path_result.get("query", ""),
+        "result_type": path_result.get("resultType", "discovery"),
+        "fit_assessed": fit_assessed,
+        "assessment_note": (
+            "A detailed personal-fit assessment was performed."
+            if fit_assessed
+            else (
+                "This is career discovery only. Do not claim the career "
+                "fits the user's personality, interests, or abilities. "
+                "No personal-fit assessment is available."
+            )
+        ),
         "career": {
             "title": c.get("title"),
-            "summary": c.get("summary"),
+            "summary": c.get("summary") or c.get("description"),
             "day_in_life": c.get("dayInLife"),
-            "skills": c.get("skills", [])
+            "skills": c.get("skills", []),
+            "source": c.get("source"),
         },
-        "fit": path_result.get("fit"),
+        "fit": path_result.get("fit") if fit_assessed else None,
+        "relevance": path_result.get("relevance"),
         "strengths": path_result.get("strengths", [])[:5],
         "gaps": path_result.get("gaps", [])[:5],
         "difficulties": path_result.get("difficulties", [])[:4],
-        "steps": path_result.get("steps", [])[:6]
+        "steps": path_result.get("steps", [])[:6],
     }

@@ -48,7 +48,7 @@ export const careerAPI = {
 };
 
 export const coachAPI = {
-  sendMessage: (message) => api.post('/api/coach', { message }),
+  sendMessage: (message, selectedCareer = null) => api.post('/api/coach', { message, selectedCareer }),
   getAIStatus: () => api.get('/api/ai-status'),
 };
 

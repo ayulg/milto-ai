@@ -113,77 +113,138 @@ export default function CareerLabPage() {
           <div className="glass-card p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
               <div>
-                <p className="text-xs text-[#d2a277] mb-1">Career Path Analysis</p>
+                <p className="text-xs text-[#d2a277] mb-1">
+                  {result.fitAssessed ? "Career Path Assessment" : "Career Discovery"}
+                </p>
                 <h2 className="font-display font-bold text-3xl">
                   {result.matchedCareer?.title || result.query}
                 </h2>
-                <p className="text-sm text-gray-400 mt-1">{result.matchedCareer?.cluster || 'General'}</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {result.matchedCareer?.source
+                    ? `Career database: ${result.matchedCareer.source.toUpperCase()}`
+                    : result.matchedCareer?.cluster || "General"}
+                </p>
               </div>
+
               <div className="text-center">
-                <div className={`font-display font-bold text-5xl mb-1 ${
-                  result.fit >= 70 ? 'text-green-400' :
-                  result.fit >= 50 ? 'text-[#d2a277]' : 'text-orange-400'
-                }`}>
-                  {result.fit}%
-                </div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide">{result.status} fit</p>
+                {result.fitAssessed ? (
+                  <>
+                    <div className={`font-display font-bold text-5xl mb-1 ${
+                      result.fit >= 70 ? 'text-green-400' :
+                      result.fit >= 50 ? 'text-[#d2a277]' : 'text-orange-400'
+                    }`}>
+                      {result.fit}%
+                    </div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      Personal fit estimate
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="font-display font-bold text-5xl mb-1 text-[#d2a277]">
+                      {result.relevance ?? 0}%
+                    </div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      Search relevance
+                    </p>
+                  </>
+                )}
               </div>
             </div>
+
             {result.matchedCareer?.summary && (
               <p className="text-gray-300">{result.matchedCareer.summary}</p>
             )}
+
+            {!result.fitAssessed && (
+              <p className="text-sm text-gray-400 mt-4 border-t border-white/10 pt-4">
+                This career matches your search. Your personal suitability has not
+                been assessed, so this relevance score is not a fit score.
+              </p>
+            )}
           </div>
 
-          {result.matchedCareer && (
+          {result.fitAssessed && result.matchedCareer && (
             <EthiopianContext careerId={result.matchedCareer.id} />
           )}
 
-          <div className="grid md:grid-cols-2 gap-6">
+          {result.fitAssessed ? (
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="glass-card p-6">
+                <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
+                  <CheckCircleIcon className="w-5 h-5 text-green-400" />
+                  Your Strengths
+                </h3>
+                {result.strengths?.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {result.strengths.map((s, i) => (
+                      <span key={i} className="px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/30 text-sm text-green-300">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">No strong signals yet.</p>
+                )}
+              </div>
+
+              <div className="glass-card p-6">
+                <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
+                  <ChartBarIcon className="w-5 h-5 text-orange-400" />
+                  Skills to Develop
+                </h3>
+                {result.gaps?.length > 0 ? (
+                  <div className="space-y-3">
+                    {result.gaps.slice(0, 4).map((gap, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-300">{gap.skill}</span>
+                          <span className="text-gray-500">{gap.have}/{gap.need}</span>
+                        </div>
+                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-orange-400 rounded-full"
+                            style={{ width: `${(gap.have / gap.need) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">No major gaps!</p>
+                )}
+              </div>
+            </div>
+          ) : (
             <div className="glass-card p-6">
-              <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
-                <CheckCircleIcon className="w-5 h-5 text-green-400" />
-                Your Strengths
+              <h3 className="font-display font-bold text-lg mb-3">
+                Skills and Career Information
               </h3>
-              {result.strengths?.length > 0 ? (
+              {((result.availableSkills?.length
+                ? result.availableSkills
+                : result.matchedCareer?.skills) || []).length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {result.strengths.map((s, i) => (
-                    <span key={i} className="px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/30 text-sm text-green-300">
-                      {s}
+                  {(result.availableSkills?.length
+                    ? result.availableSkills
+                    : result.matchedCareer.skills).slice(0, 20).map((skill, i) => (
+                    <span key={i} className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-gray-300">
+                      {typeof skill === "string" ? skill : skill.name || skill.skill}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">No strong signals yet.</p>
+                <p className="text-sm text-gray-400">
+                  A structured skill list is not available for this occupation yet.
+                  You can still explore its description and use the career coach
+                  to build a learning plan.
+                </p>
               )}
+              <p className="text-xs text-gray-500 mt-4">
+                Personal strengths and skill gaps are not available for this
+                discovery result.
+              </p>
             </div>
-
-            <div className="glass-card p-6">
-              <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
-                <ChartBarIcon className="w-5 h-5 text-orange-400" />
-                Skills to Develop
-              </h3>
-              {result.gaps?.length > 0 ? (
-                <div className="space-y-3">
-                  {result.gaps.slice(0, 4).map((gap, i) => (
-                    <div key={i}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-300">{gap.skill}</span>
-                        <span className="text-gray-500">{gap.have}/{gap.need}</span>
-                      </div>
-                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-orange-400 rounded-full"
-                          style={{ width: `${(gap.have / gap.need) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">No major gaps!</p>
-              )}
-            </div>
-          </div>
+          )}
 
           {result.difficulties?.length > 0 && (
             <div className="glass-card p-6">
@@ -226,21 +287,32 @@ export default function CareerLabPage() {
             <button
               onClick={() => {
                 const careerName = result.matchedCareer?.title || result.query || query;
-                const prompt = `Act as my personalized Milto career coach. Help me build skills for ${careerName}.
-
-Career Lab assessment:
-- Fit score: ${result.fit ?? "Not assessed"}%
+                const assessmentDetails = result.fitAssessed
+                  ? `Career Lab personal fit assessment:
+- Fit score: ${result.fit}%
 - Status: ${result.status || "Not assessed"}
 - Strengths: ${result.strengths?.join(", ") || "Not yet identified"}
 - Skill gaps: ${result.gaps?.map(g => `${g.skill} (current ${g.have}, target ${g.need})`).join("; ") || "Not yet assessed"}
-- Suggested steps: ${result.steps?.map(s => `Week ${s.week}: ${s.title} ? ${s.action}`).join("; ") || "Not available"}
+- Suggested steps: ${result.steps?.map(s => `Week ${s.week}: ${s.title} - ${s.action}`).join("; ") || "Not available"}`
+                  : `Career discovery:
+- Search relevance: ${result.relevance ?? "Not available"}%
+- Personal fit: Not assessed
+- Career description: ${result.matchedCareer?.description || result.matchedCareer?.summary || "Not available"}
+- Available skills: ${(result.availableSkills?.length ? result.availableSkills : result.matchedCareer?.skills || []).join(", ") || "Not available"}
+- Important: Do not assume this career is personally suitable based on search relevance.`;
 
-Create a practical weekly development plan with priorities, exercises, milestones, and ways to measure progress. Treat missing information as unknown, not zero. These results are estimates. Ask focused questions if needed. Be supportive, direct, and specific.`;
-                navigate("/coach", { state: { initialPrompt: prompt } });
+                const prompt = `Act as my Milto career coach. Help me explore and prepare for ${careerName}.
+
+${assessmentDetails}
+
+Create a practical weekly learning plan with priorities, exercises, milestones, and ways to measure progress. Treat missing information as unknown, not zero. Do not invent my existing abilities or claim that my personal fit has been assessed when it has not. Ask focused questions if needed. Be supportive, direct, and specific.`;
+                navigate("/coach", { state: { initialPrompt: prompt, selectedCareer: careerName } });
               }}
               className="btn btn-primary"
             >
-              Build My Personal Development Plan ?
+              {result.fitAssessed
+                ? "Build My Personal Development Plan"
+                : "Build a Career Learning Plan"}
             </button>
             <button
               onClick={() => { setResult(null); setQuery(''); }}

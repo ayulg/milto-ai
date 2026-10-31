@@ -1,6 +1,7 @@
 """Database layer for Milto AI"""
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -330,13 +331,39 @@ def add_chat_message(user_id, role, content):
 
 
 def get_chat_history(user_id, limit=30):
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return []
+
+    if limit < 0:
+        return []
+
+    limit = min(limit, 100)
+
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT role, content FROM chat_messages WHERE user_id = ? ORDER BY id ASC LIMIT ?",
-        (user_id, limit)
-    ).fetchall()
-    conn.close()
-    return [{"role": r["role"], "content": r["content"]} for r in rows]
+    try:
+        rows = conn.execute(
+            """
+            SELECT role, content
+            FROM (
+                SELECT id, role, content
+                FROM chat_messages
+                WHERE user_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+            )
+            ORDER BY id ASC
+            """,
+            (user_id, limit),
+        ).fetchall()
+
+        return [
+            {"role": row["role"], "content": row["content"]}
+            for row in rows
+        ]
+    finally:
+        conn.close()
 
 
 # ============ SETTINGS ============
@@ -354,30 +381,65 @@ def get_settings(user_id):
     return d
 
 
+
 def update_settings(user_id, theme=None, notifications_enabled=None, reminder_time=None, motivation_style=None):
     current = get_settings(user_id)
+
+    # Validate reminder time using strict 24-hour HH:MM format.
+    valid_reminder = current["reminder_time"]
+
+    if reminder_time is not None:
+        reminder_time = str(reminder_time).strip()
+
+        if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", reminder_time):
+            valid_reminder = reminder_time
+
     values = {
         "theme": theme if theme in ("dark", "light") else current["theme"],
-        "notifications_enabled": int(bool(notifications_enabled)) if notifications_enabled is not None else int(current["notifications_enabled"]),
-        "reminder_time": reminder_time or current["reminder_time"],
-        "motivation_style": motivation_style if motivation_style in ("gentle", "direct", "celebrate") else current["motivation_style"],
+        "notifications_enabled": (
+            int(bool(notifications_enabled))
+            if notifications_enabled is not None
+            else int(current["notifications_enabled"])
+        ),
+        "reminder_time": valid_reminder,
+        "motivation_style": (
+            motivation_style
+            if motivation_style in ("gentle", "direct", "celebrate")
+            else current["motivation_style"]
+        ),
     }
+
     conn = get_conn()
-    conn.execute(
-        """INSERT INTO user_settings (user_id, theme, notifications_enabled, reminder_time, motivation_style, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT(user_id) DO UPDATE SET 
-           theme=excluded.theme, 
-           notifications_enabled=excluded.notifications_enabled,
-           reminder_time=excluded.reminder_time, 
-           motivation_style=excluded.motivation_style, 
-           updated_at=excluded.updated_at""",
-        (user_id, values["theme"], values["notifications_enabled"],
-         values["reminder_time"], values["motivation_style"], now()),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute(
+            """
+            INSERT INTO user_settings (
+                user_id, theme, notifications_enabled,
+                reminder_time, motivation_style, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                theme=excluded.theme,
+                notifications_enabled=excluded.notifications_enabled,
+                reminder_time=excluded.reminder_time,
+                motivation_style=excluded.motivation_style,
+                updated_at=excluded.updated_at
+            """,
+            (
+                user_id,
+                values["theme"],
+                values["notifications_enabled"],
+                values["reminder_time"],
+                values["motivation_style"],
+                now(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
     return get_settings(user_id)
+
 
 
 # ============ DAILY ============
@@ -433,13 +495,32 @@ def add_reflection(user_id, day_key, prompt, response):
 
 
 def get_reflections(user_id, limit=30):
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        return []
+
+    if limit < 0:
+        return []
+
+    limit = min(limit, 100)
+
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT id, day_key, prompt, response, created_at FROM reflections WHERE user_id = ? ORDER BY id DESC LIMIT ?",
-        (user_id, limit),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM reflections
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
 
 
 # ============ CAREER PLANS ============
